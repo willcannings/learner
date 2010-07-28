@@ -1,25 +1,26 @@
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
+#include <stdio.h>
 #include <math.h>
 #include "sparse_vector.h"
 
 SparseVector *sparse_vector_new() {
-  SparseVector *vector = (SparseVector *) malloc(sizeof(SparseVector));
-  vector->count = 0;
-  vector->klass  = 0;
-  vector->_frozen = 0;
-  vector->_magnitude = 0.0;
-  vector->_min_index = -1;
-  vector->_max_index = -1;
-  
-  // postconditions
+  SparseVector *vector  = (SparseVector *) malloc(sizeof(SparseVector));
+  vector->values        = NULL;
+  vector->count         = 0;
+  vector->klass         = 0;
+  vector->_frozen       = 0;
+  vector->_magnitude    = 0.0;
+  vector->_min_index    = -1;
+  vector->_max_index    = -1;  
+
   assert(vector);
   return vector;
 }
 
 
 void sparse_vector_free(SparseVector *vector) {
-  // preconditions
   assert(vector);
   
   // todo - test vector->values true & false
@@ -30,7 +31,6 @@ void sparse_vector_free(SparseVector *vector) {
 
 
 void sparse_vector_freeze(SparseVector *vector) {
-  // no-op if the vector has already been frozen
   assert(vector);
   if(vector->_frozen)
     return;
@@ -41,20 +41,76 @@ void sparse_vector_freeze(SparseVector *vector) {
 
 
 char sparse_vector_frozen(SparseVector *vector) {
-  // preconditions
   assert(vector);
   return vector->_frozen == 1;
 }
 
 
+// TODO: test unfreeze
+void sparse_vector_unfreeze(SparseVector *vector) {
+  assert(vector);
+  vector->_frozen = 0;
+}
+
+
+void sparse_vector_set(SparseVector *vector, int index, float value) {
+  assert(vector);
+  assert(index >= 0);
+  
+  // if we're inserting a value in between existing values, determine
+  // how many values will exist below the value we're inserting
+  int lower_values_count = 0;
+  for(int i = 0, count = vector->count; i < count; i++) {
+    if(vector->values[i].index == index) {
+      vector->values[i].value = value;
+      return;
+    }
+    
+    if(vector->values[i].index < index)
+      lower_values_count++;
+    else
+      break;
+  }
+  
+  // create a new values array, copy the values below the new value,
+  // then the values following the new value, before setting the value
+  sparse_vector_value *new_values = (sparse_vector_value *) malloc(sizeof(sparse_vector_value) * (vector->count + 1));
+  memcpy((void *) new_values, (void *) vector->values, lower_values_count * sizeof(sparse_vector_value));
+  memcpy((void *) new_values + ((lower_values_count + 1) * sizeof(sparse_vector_value)), (void *) vector->values + (lower_values_count * sizeof(sparse_vector_value)), (vector->count - lower_values_count) * sizeof(sparse_vector_value));
+  new_values[lower_values_count].index = index;
+  new_values[lower_values_count].value = value;
+  
+  if(vector->values)
+    free(vector->values);
+  vector->values = new_values;
+
+  if(index < vector->_min_index || vector->_min_index == -1)
+    vector->_min_index = index;  
+  if(index > vector->_max_index || vector->_max_index == -1)
+    vector->_max_index = index;
+  vector->count++;
+}
+
+
+float sparse_vector_get(SparseVector *vector, int index) {
+  assert(vector);
+  assert(index >= vector->_min_index && index <= vector->_max_index);
+  
+  for(int i = 0, count = vector->count; i < count; i++)
+    if(vector->values[i].index == index)
+      return vector->values[i].value;
+  
+  // TODO: set error code
+  return 0;
+}
+
+
 float sparse_vector_dot_product(SparseVector *v1, SparseVector *v2) {
-  // if either vector is length 0, the dot product will always be 0
   assert(v1);
   assert(v2);
   if(v1->count == 0 || v2->count == 0)
     return 0.0;
 
-  // preconditions
   assert(v1->count == v2->count);
   assert(v1->values);
   assert(v2->values);
@@ -67,12 +123,10 @@ float sparse_vector_dot_product(SparseVector *v1, SparseVector *v2) {
 
 
 float sparse_vector_magnitude(SparseVector *vector) {
-  // if we've cached the magnitude of this vector, return it immediately
   assert(vector);
   if(vector->_frozen)
     return vector->_magnitude;
 
-  // preconditions  
   if(vector->count > 0)
     assert(vector->values);
   else
@@ -95,12 +149,12 @@ float sparse_vector_euclidean_distance(SparseVector *v1, SparseVector *v2) {
   // if one vector is length 0, the euclidean distance is equivalent to the magnitude of the other vector
   assert(v1);
   assert(v2);
+  // TODO: are these opts valid for sparse vectors?
   if(v1->count == 0)
     return sparse_vector_magnitude(v2);
   if(v2->count == 0)
     return sparse_vector_magnitude(v1);
   
-  // preconditions
   assert(v1->values);  
   assert(v2->values);
 

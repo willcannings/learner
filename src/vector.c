@@ -4,17 +4,15 @@
 #include "vector.h"
 
 Vector *vector_new(int length) {
-  // preconditions
   assert(length > 0);
   
   Vector *vector = (Vector *) malloc(sizeof(Vector));
-  vector->length = length;
-  vector->klass  = 0;
-  vector->_frozen = 0;
-  vector->_magnitude = 0.0;
-  vector->values = (float *) calloc(sizeof(float), length);
+  vector->length      = length;
+  vector->klass       = 0;
+  vector->_frozen     = 0;
+  vector->_magnitude  = 0.0;
+  vector->values      = (float *) calloc(sizeof(float), length);
   
-  // postconditions
   assert(vector);
   assert(vector->values);
   return vector;
@@ -22,17 +20,14 @@ Vector *vector_new(int length) {
 
 
 void vector_free(Vector *vector) {
-  // preconditions
   assert(vector);
-  assert(vector->values);
-  
+  assert(vector->values);  
   free(vector->values);
   free(vector);
 }
 
 
 void vector_freeze(Vector *vector) {
-  // no-op if the vector has already been frozen
   assert(vector);
   if(vector->_frozen)
     return;
@@ -44,14 +39,32 @@ void vector_freeze(Vector *vector) {
 
 
 char vector_frozen(Vector *vector) {
-  // preconditions
   assert(vector);
   return vector->_frozen == 1;
 }
 
 
+void vector_unfreeze(Vector *vector) {
+  assert(vector);
+  vector->_frozen = 0;
+}
+
+
+void vector_set(Vector *vector, int index, float value) {
+  assert(vector);
+  assert(index >= 0 && index <= (vector->length - 1));
+  vector->values[index] = value;
+}
+
+
+float vector_get(Vector *vector, int index) {
+  assert(vector);
+  assert(index >= 0 && index <= (vector->length - 1));
+  return vector->values[index];
+}
+
+
 float vector_dot_product(Vector *v1, Vector *v2) {
-  // preconditions
   assert(v1);
   assert(v2);
   assert(v1->length == v2->length);
@@ -66,7 +79,6 @@ float vector_dot_product(Vector *v1, Vector *v2) {
 
 
 float vector_magnitude(Vector *vector) {
-  // if we've cached the magnitude of this vector, return it immediately
   assert(vector);
   if(vector->_frozen)
     return vector->_magnitude;
@@ -87,12 +99,11 @@ float vector_cosine_similarity(Vector *v1, Vector *v2) {
 
 
 float vector_euclidean_distance(Vector *v1, Vector *v2) {
-  // preconditions
   assert(v1);
   assert(v2);
-  assert(v1->length == v2->length);
   assert(v1->values);
   assert(v2->values);
+  assert(v1->length == v2->length);
   
   float accumulator = 0.0;
   for(int i = 0, length = v1->length; i < length; i++)
