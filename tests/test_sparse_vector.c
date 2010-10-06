@@ -27,14 +27,16 @@ int test_sparse_vector() {
   test_set_value(v1, 1, 2.0);
   test_set_value(v1, 0, 1.0);
   test_set_value(v2, 0, 3.0);
-  test_set_value(v2, 1, 4.0);
+  test_set_value(v2, 3, 4.0);
+  test_set_value(v2, 2, 5.0);
   
   // getting
   float value;
   test_get_value(v1, 0, 1.0);
   test_get_value(v1, 1, 2.0);
   test_get_value(v2, 0, 3.0);
-  test_get_value(v2, 1, 4.0);
+  test_get_value(v2, 2, 5.0);
+  test_get_value(v2, 3, 4.0);
   
   // freezing
   int frozen;
@@ -55,22 +57,22 @@ int test_sparse_vector() {
   test_float(value, sqrtf(5.0));
   error = sparse_vector_magnitude(v2, &value);
   test_error(error);
-  test_float(value, sqrtf(25.0));
+  test_float(value, sqrtf(50.0));
   
   // euclidean distance
   error = sparse_vector_euclidean_distance(v1, v2, &value);
   test_error(error);
-  test_float(value, sqrtf(4.0 + 4.0));
+  test_float(value, sqrtf(4.0 + 4.0 + 25.0 + 16.0));
   
   // dot product
   error = sparse_vector_dot_product(v1, v2, &value);
   test_error(error);
-  test_float(value, (3.0 + 8.0));
+  test_float(value, 3.0);
   
   // cosine similarity
   error = sparse_vector_cosine_similarity(v1, v2, &value);
   test_error(error);
-  test_float(value, ((3.0 + 8.0) / (sqrtf(5.0) * sqrtf(25.0))));
+  test_float(value, ((3.0) / (sqrtf(5.0) * sqrtf(50.0))));
   
   // cleanup
   error = sparse_vector_free(v1);
