@@ -1,5 +1,5 @@
-#include "errors.h"
 #include <sys/types.h>
+#include "errors.h"
 
 #ifndef __learner_sparse_vector__
 #define __learner_sparse_vector__
@@ -13,10 +13,10 @@ typedef struct {
 
 typedef struct {
   u_int32_t count;
-  u_int8_t  _frozen;
-  float     _magnitude;
-  u_int32_t _min_index;
-  u_int32_t _max_index;  
+  u_int8_t  frozen;
+  float     magnitude;
+  u_int32_t min_index;
+  u_int32_t max_index;  
 } sparse_vector_header;
 
 typedef struct {
@@ -27,20 +27,20 @@ typedef struct {
 
 
 // core functions
-SparseVector *sparse_vector_new(void);
-void    sparse_vector_free(SparseVector *vector);
-void    sparse_vector_freeze(SparseVector *vector);
-char    sparse_vector_frozen(SparseVector *vector);
-void    sparse_vector_unfreeze(SparseVector *vector);
+learner_error sparse_vector_new(SparseVector **vector);
+learner_error sparse_vector_free(SparseVector *vector);
+learner_error sparse_vector_freeze(SparseVector *vector);
+learner_error sparse_vector_frozen(SparseVector *vector, int *frozen);
+learner_error sparse_vector_unfreeze(SparseVector *vector);
 
 // getter & setter required because we don't have contiguous data
-void    sparse_vector_set(SparseVector *vector, int index, float value);
-float   sparse_vector_get(SparseVector *vector, int index);
+learner_error sparse_vector_set(SparseVector *vector, int index, float value);
+learner_error sparse_vector_get(SparseVector *vector, int index, float *value);
 
 // calculations
-float   sparse_vector_dot_product(SparseVector *v1, SparseVector *v2);
-float   sparse_vector_magnitude(SparseVector *vector);
-float   sparse_vector_cosine_similarity(SparseVector *v1, SparseVector *v2);
-float   sparse_vector_euclidean_distance(SparseVector *v1, SparseVector *v2);
+learner_error sparse_vector_dot_product(SparseVector *v1, SparseVector *v2, float *result);
+learner_error sparse_vector_magnitude(SparseVector *vector, float *result);
+learner_error sparse_vector_cosine_similarity(SparseVector *v1, SparseVector *v2, float *result);
+learner_error sparse_vector_euclidean_distance(SparseVector *v1, SparseVector *v2, float *result);
 
 #endif

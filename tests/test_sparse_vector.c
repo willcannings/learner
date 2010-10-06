@@ -1,38 +1,81 @@
 #include "tests.h"
 
+#define test_get_value(v, index, val) {\
+  error = sparse_vector_get(v, index, &value);\
+  test_error(error);\
+  test_float(value, val);\
+}
+
+#define test_set_value(v, index, val) {\
+  error = sparse_vector_set(v, index, val);\
+  test_error(error);\
+}
+
+
 int test_sparse_vector() {
   starting_tests();
-  SparseVector *v1 = sparse_vector_new();
-  SparseVector *v2 = sparse_vector_new();
+  learner_error error;
+  SparseVector *v1, *v2;
   
-  /* setting and getting */
-  sparse_vector_set(v1, 1, 2.0);
-  sparse_vector_set(v1, 0, 1.0);
-  sparse_vector_set(v2, 1, 4.0);
-  sparse_vector_set(v2, 0, 3.0);
-  test_float(sparse_vector_get(v1, 0), 1.0);
-  test_float(sparse_vector_get(v1, 1), 2.0);
-  test_float(sparse_vector_get(v2, 0), 3.0);
-  test_float(sparse_vector_get(v2, 1), 4.0);
+  // creating
+  error = sparse_vector_new(&v1);
+  test_error(error);
+  error = sparse_vector_new(&v2);
+  test_error(error);
   
-  /* freezing */
-  sparse_vector_freeze(v1);
-  sparse_vector_freeze(v2);
-  test(sparse_vector_frozen(v1));
-  test(sparse_vector_frozen(v2));
+  // setting
+  test_set_value(v1, 1, 2.0);
+  test_set_value(v1, 0, 1.0);
+  test_set_value(v2, 0, 3.0);
+  test_set_value(v2, 1, 4.0);
   
-  /* internal properties */  
-  test(fabs(sparse_vector_magnitude(v1) - sqrtf(5.0)) <= FLT_EPSILON);
-  test(fabs(sparse_vector_magnitude(v2) - sqrtf(25.0)) <= FLT_EPSILON);
+  // getting
+  float value;
+  test_get_value(v1, 0, 1.0);
+  test_get_value(v1, 1, 2.0);
+  test_get_value(v2, 0, 3.0);
+  test_get_value(v2, 1, 4.0);
   
-  /* calculations with other vectors */
-  test(fabs(sparse_vector_euclidean_distance(v1, v2) - sqrtf(4.0 + 4.0)) <= FLT_EPSILON);
-  test(fabs(sparse_vector_dot_product(v1, v2) - (3.0 + 8.0)) <= FLT_EPSILON);
-  test(fabs(sparse_vector_cosine_similarity(v1, v2) - ((3.0 + 8.0) / (sqrtf(5.0) * sqrtf(25.0)))) <= FLT_EPSILON);
+  // freezing
+  int frozen;
+  error = sparse_vector_freeze(v1);
+  test_error(error);
+  error = sparse_vector_freeze(v2);
+  test_error(error);
+  error = sparse_vector_frozen(v1, &frozen);
+  test_error(error);
+  test(frozen);
+  error = sparse_vector_frozen(v2, &frozen);
+  test_error(error);
+  test(frozen);
   
-  /* cleanup */
-  sparse_vector_free(v1);
-  sparse_vector_free(v2);
+  // magnitude
+  error = sparse_vector_magnitude(v1, &value);
+  test_error(error);
+  test_float(value, sqrtf(5.0));
+  error = sparse_vector_magnitude(v2, &value);
+  test_error(error);
+  test_float(value, sqrtf(25.0));
   
+  // euclidean distance
+  error = sparse_vector_euclidean_distance(v1, v2, &value);
+  test_error(error);
+  test_float(value, sqrtf(4.0 + 4.0));
+  
+  // dot product
+  error = sparse_vector_dot_product(v1, v2, &value);
+  test_error(error);
+  test_float(value, (3.0 + 8.0));
+  
+  // cosine similarity
+  error = sparse_vector_cosine_similarity(v1, v2, &value);
+  test_error(error);
+  test_float(value, ((3.0 + 8.0) / (sqrtf(5.0) * sqrtf(25.0))));
+  
+  // cleanup
+  error = sparse_vector_free(v1);
+  test_error(error);
+  error = sparse_vector_free(v2);
+  test_error(error);
   finished_tests();
 }

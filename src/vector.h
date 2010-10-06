@@ -1,3 +1,4 @@
+#include <sys/types.h>
 #include "errors.h"
 
 #ifndef __learner_vector__
@@ -24,7 +25,7 @@ learner_error vector_freeze(Vector *vector);
 learner_error vector_frozen(Vector *vector, int *frozen);
 learner_error vector_unfreeze(Vector *vector);
 
-// getter & setter to match the sparse matrix functions
+// getter & setter to match the sparse vector functions
 learner_error vector_set(Vector *vector, int index, float value);
 learner_error vector_get(Vector *vector, int index, float *value);
 
