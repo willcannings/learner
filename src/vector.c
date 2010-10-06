@@ -1,112 +1,114 @@
 #include <stdlib.h>
-#include <assert.h>
 #include <math.h>
+#include "logging.h"
+#include "errors.h"
 #include "vector.h"
 
-Vector *vector_new(int length) {
-  assert(length > 0);
-  
-  Vector *vector = (Vector *) malloc(sizeof(Vector));
-  vector->length      = length;
-  vector->klass       = 0;
-  vector->_frozen     = 0;
-  vector->_magnitude  = 0.0;
-  vector->values      = (float *) calloc(sizeof(float), length);
-  
-  assert(vector);
-  assert(vector->values);
-  return vector;
+learner_error vector_new(int length, Vector **vector) {
+  if(length <= 0) return INVALID_LENGTH;
+  *vector = (Vector *) calloc(1, sizeof(Vector));
+  (*vector)->length = length;
+  (*vector)->values = (float *) calloc(sizeof(float), length);
+  return NO_ERROR;
 }
 
 
-void vector_free(Vector *vector) {
-  assert(vector);
-  assert(vector->values);  
+learner_error vector_free(Vector *vector) {
+  if(!vector) return MISSING_VECTOR;
+  if(!vector->values) return MISSING_VALUES;
   free(vector->values);
   free(vector);
+  return NO_ERROR;
 }
 
 
-void vector_freeze(Vector *vector) {
-  assert(vector);
-  if(vector->_frozen)
-    return;
-  assert(vector->values);
-
-  vector->_magnitude = vector_magnitude(vector);
-  vector->_frozen = 1;
+learner_error vector_freeze(Vector *vector) {
+  if(!vector) return MISSING_VECTOR;
+  if(!vector->_frozen) {
+    learner_error error = vector_magnitude(vector, &vector->_magnitude);
+    if(error) return error;
+    vector->_frozen = 1;
+  }
+  return NO_ERROR;
 }
 
 
-char vector_frozen(Vector *vector) {
-  assert(vector);
-  return vector->_frozen == 1;
+learner_error vector_frozen(Vector *vector, int *frozen) {
+  if(!vector) return MISSING_VECTOR;
+  *frozen = (vector->_frozen == 1);
+  return NO_ERROR;
 }
 
 
-void vector_unfreeze(Vector *vector) {
-  assert(vector);
+learner_error vector_unfreeze(Vector *vector) {
+  if(!vector) return MISSING_VECTOR;
   vector->_frozen = 0;
+  return NO_ERROR;
 }
 
 
-void vector_set(Vector *vector, int index, float value) {
-  assert(vector);
-  assert(index >= 0 && index <= (vector->length - 1));
+learner_error vector_set(Vector *vector, int index, float value) {
+  if(!vector) return MISSING_VECTOR;
+  if(index < 0 || index > (vector->length - 1)) return INDEX_OUT_OF_RANGE;
   vector->values[index] = value;
+  return NO_ERROR;
 }
 
 
-float vector_get(Vector *vector, int index) {
-  assert(vector);
-  assert(index >= 0 && index <= (vector->length - 1));
-  return vector->values[index];
+learner_error vector_get(Vector *vector, int index, float *value) {
+  if(!vector) return MISSING_VECTOR;
+  if(index < 0 || index > (vector->length - 1)) return INDEX_OUT_OF_RANGE;
+  *value = vector->values[index];
+  return NO_ERROR;
 }
 
 
-float vector_dot_product(Vector *v1, Vector *v2) {
-  assert(v1);
-  assert(v2);
-  assert(v1->length == v2->length);
-  assert(v1->values);
-  assert(v2->values);
-  
-  float accumulator = 0.0;
+learner_error vector_dot_product(Vector *v1, Vector *v2, float *result) {
+  if(!v1 || !v2) return MISSING_VECTOR;
+  if(v1->length != v2->length) return VECTORS_NOT_OF_EQUAL_LENGTH;
+  *result = 0.0;
   for(int i = 0, length = v1->length; i < length; i++)
-    accumulator += v1->values[i] * v2->values[i];
-  return accumulator;
+    *result += v1->values[i] * v2->values[i];
+  return NO_ERROR;
 }
 
 
-float vector_magnitude(Vector *vector) {
-  assert(vector);
-  if(vector->_frozen)
-    return vector->_magnitude;
-  else
-    assert(vector->values);
-  
-  float accumulator = 0.0;  
+learner_error vector_magnitude(Vector *vector, float *result) {
+  if(!vector) return MISSING_VECTOR;
+  if(vector->_frozen) {*result = vector->_magnitude; return NO_ERROR;}
+  *result = 0.0;  
   for(int i = 0, length = vector->length; i < length; i++)
-    accumulator += powf(vector->values[i], 2);
-  return sqrtf(accumulator);
+    *result += powf(vector->values[i], 2);
+  *result = sqrtf(*result);
+  return NO_ERROR;
 }
 
 
 // TODO: add optimisation for euclidean normal 1 vectors (just return dot product)
-float vector_cosine_similarity(Vector *v1, Vector *v2) {
-  return vector_dot_product(v1, v2) / (vector_magnitude(v1) * vector_magnitude(v2));
+learner_error vector_cosine_similarity(Vector *v1, Vector *v2, float *result) {
+  float dot_product, magnitude_v1, magnitude_v2;
+  learner_error error;
+  
+  if(error = vector_dot_product(v1, v2, &dot_product))
+    return error;
+  
+  if(error = vector_magnitude(v1, &magnitude_v1))
+    return error;
+  
+  if(error = vector_magnitude(v2, &magnitude_v2))
+    return error;
+  
+  *result = dot_product / (magnitude_v1 * magnitude_v2);
+  return NO_ERROR;
 }
 
 
-float vector_euclidean_distance(Vector *v1, Vector *v2) {
-  assert(v1);
-  assert(v2);
-  assert(v1->values);
-  assert(v2->values);
-  assert(v1->length == v2->length);
-  
-  float accumulator = 0.0;
+learner_error vector_euclidean_distance(Vector *v1, Vector *v2, float *result) {
+  if(!v1 || !v2) return MISSING_VECTOR;
+  if(v1->length != v2->length) return VECTORS_NOT_OF_EQUAL_LENGTH;
+  *result = 0.0;
   for(int i = 0, length = v1->length; i < length; i++)
-    accumulator += powf(v1->values[i] - v2->values[i], 2);
-  return sqrtf(accumulator);
+    *result += powf(v1->values[i] - v2->values[i], 2);
+  *result = sqrtf(*result);
+  return NO_ERROR;
 }

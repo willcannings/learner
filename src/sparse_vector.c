@@ -6,15 +6,9 @@
 #include "sparse_vector.h"
 
 SparseVector *sparse_vector_new() {
-  SparseVector *vector  = (SparseVector *) malloc(sizeof(SparseVector));
-  vector->values        = NULL;
-  vector->count         = 0;
-  vector->klass         = 0;
-  vector->_frozen       = 0;
-  vector->_magnitude    = 0.0;
+  SparseVector *vector  = (SparseVector *) calloc(1, sizeof(SparseVector));
   vector->_min_index    = -1;
-  vector->_max_index    = -1;  
-
+  vector->_max_index    = -1;
   assert(vector);
   return vector;
 }
@@ -96,6 +90,7 @@ float sparse_vector_get(SparseVector *vector, int index) {
   assert(vector);
   assert(index >= vector->_min_index && index <= vector->_max_index);
   
+  // TODO: binary search instead of linear
   for(int i = 0, count = vector->count; i < count; i++)
     if(vector->values[i].index == index)
       return vector->values[i].value;
