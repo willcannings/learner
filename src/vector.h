@@ -3,12 +3,19 @@
 #ifndef __learner_vector__
 #define __learner_vector__
 
+#pragma pack(push)
+#pragma pack(1)
 typedef struct {
-  int   length;
-  char  _frozen;
-  float _magnitude;
+  u_int32_t length;
+  u_int8_t  _frozen;
+  float     _magnitude;  
+} vector_header;
+
+typedef struct {
+  vector_header header;
   float *values;
 } Vector;
+#pragma pack(pop)
 
 // core functions
 learner_error vector_new(int length, Vector **vector);

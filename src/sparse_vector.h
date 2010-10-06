@@ -1,22 +1,29 @@
+#include "errors.h"
+#include <sys/types.h>
+
 #ifndef __learner_sparse_vector__
 #define __learner_sparse_vector__
 
+#pragma pack(push)
+#pragma pack(1)
 typedef struct {
-  int   index;
-  float value;
+  u_int32_t index;
+  float     value;
 } sparse_vector_value;
 
 typedef struct {
-  int   count;
-  int   klass;
-  
-  char  _frozen;
-  float _magnitude;
-  int   _min_index;
-  int   _max_index;
-  
-  sparse_vector_value *values;
+  u_int32_t count;
+  u_int8_t  _frozen;
+  float     _magnitude;
+  u_int32_t _min_index;
+  u_int32_t _max_index;  
+} sparse_vector_header;
+
+typedef struct {
+  sparse_vector_header  header;
+  sparse_vector_value   *values;
 } SparseVector;
+#pragma pack(pop)
 
 
 // core functions
