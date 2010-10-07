@@ -1,6 +1,6 @@
 #include <pthread.h>
 #include <stdio.h>
-#include "errors.h"
+#include "core/errors.h"
 
 #ifndef __learner_logging__
 #define __learner_logging__

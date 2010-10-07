@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include <math.h>
-#include "logging.h"
-#include "errors.h"
-#include "vector.h"
+#include "core/logging.h"
+#include "core/errors.h"
+#include "structures/vector.h"
 
 learner_error vector_new(int length, Vector **vector) {
   if(length <= 0) return INVALID_LENGTH;

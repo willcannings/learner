@@ -1,5 +1,5 @@
 #include <sys/types.h>
-#include "errors.h"
+#include "core/errors.h"
 
 #ifndef __learner_sparse_vector__
 #define __learner_sparse_vector__

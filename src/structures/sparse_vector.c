@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-#include "sparse_vector.h"
+#include "structures/sparse_vector.h"
 
 learner_error sparse_vector_new(SparseVector **vector) {
   *vector = (SparseVector *) calloc(1, sizeof(SparseVector));

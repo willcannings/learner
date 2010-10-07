@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <time.h>
-#include "logging.h"
-#include "errors.h"
+#include "core/logging.h"
+#include "core/errors.h"
 
 learner_error set_learner_logging_level(learner_logging_level new_level) {
   int error = pthread_mutex_lock(&logging_lock);

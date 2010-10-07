@@ -1,9 +1,10 @@
 #ifndef __learner__
 #define __learner__
 
-#include "errors.h"
-#include "vector.h"
-#include "sparse_vector.h"
+#include "core/errors.h"
+#include "core/logging.h"
+#include "structures/vector.h"
+#include "structures/sparse_vector.h"
 
 void learner_initialize();
 

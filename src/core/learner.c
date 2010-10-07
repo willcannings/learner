@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "learner.h"
-#include "globals.h"
+#include "core/globals.h"
 
 void learner_initialize() {
   // initialise errors
