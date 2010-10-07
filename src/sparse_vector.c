@@ -68,6 +68,7 @@ learner_error sparse_vector_set(SparseVector *vector, int index, float value) {
   
   // create a new values array, copy the values below the new value,
   // then the values following the new value, before setting the value
+  // TODO: why isn't this a re-alloc!?!?
   sparse_vector_value *new_values = (sparse_vector_value *) malloc(sizeof(sparse_vector_value) * (vector->header.count + 1));
   memcpy((void *) new_values, (void *) vector->values, lower_values_count * sizeof(sparse_vector_value));
   memcpy((void *) new_values + ((lower_values_count + 1) * sizeof(sparse_vector_value)), (void *) vector->values + (lower_values_count * sizeof(sparse_vector_value)), (vector->header.count - lower_values_count) * sizeof(sparse_vector_value));
@@ -106,29 +107,36 @@ learner_error sparse_vector_get(SparseVector *vector, int index, float *value) {
 
 learner_error sparse_vector_dot_product(SparseVector *v1, SparseVector *v2, float *result) {
   if(!v1 || !v2) return MISSING_VECTOR;
-  if(v1->header.count == 0 || v2->header.count == 0) {
-    *result = 0.0;
-    return NO_ERROR;
-  }
-
+  if(v1->header.count == 0 || v2->header.count == 0) {*result = 0.0; return NO_ERROR;}
+  
+  // TODO: binary search or fixed length jumping. rather than just iterating through
+  // each entry to find the next entry we're interested in, we can use a binary search
+  // to help us 'jump' through the list, like skip lists. We could aso use fixed length
+  // jumps (such as every 10 elements, or one quarter of the list).
+  int v1_count = v1->header.count, v2_count = v2->header.count;
+  int v1_pos = 0, v2_pos = 0;
   *result = 0.0;
-  for(int i = 0, count = v1->header.count; i < count; i++)
-    *result += v1->values[i].value * v2->values[i].value;
+  
+  while(v1_pos < v1_count && v2_pos < v2_count) {
+    if(v1->values[v1_pos].index == v2->values[v2_pos].index) {
+      *result += v1->values[v1_pos].value * v2->values[v2_pos].value;
+      v1_pos++;
+      v2_pos++;
+    } else if(v1->values[v1_pos].index < v2->values[v2_pos].index) {
+      v1_pos++;
+    } else {
+      v2_pos++;
+    }
+  }
+  
   return NO_ERROR;
 }
 
 
 learner_error sparse_vector_magnitude(SparseVector *vector, float *result) {
   if(!vector) return MISSING_VECTOR;
-  if(vector->header.frozen) {
-    *result = vector->header.magnitude;
-    return NO_ERROR;
-  }
-
-  if(vector->header.count == 0) {
-    *result = 0.0;
-    return NO_ERROR;
-  }
+  if(vector->header.frozen) {*result = vector->header.magnitude; return NO_ERROR;}
+  if(vector->header.count == 0) {*result = 0.0; return NO_ERROR;}
 
   *result = 0.0;
   for(int i = 0, count = vector->header.count; i < count; i++)
@@ -160,15 +168,40 @@ learner_error sparse_vector_cosine_similarity(SparseVector *v1, SparseVector *v2
 learner_error sparse_vector_euclidean_distance(SparseVector *v1, SparseVector *v2, float *result) {
   // if one vector is length 0, the euclidean distance is equivalent to the magnitude of the other vector
   if(!v1 || !v2) return MISSING_VECTOR;
-  // TODO: are these opts valid for sparse vectors?
   if(v1->header.count == 0)
     return sparse_vector_magnitude(v2, result);
   else if(v2->header.count == 0)
     return sparse_vector_magnitude(v1, result);
   
+  int v1_count = v1->header.count, v2_count = v2->header.count;
+  int v1_pos = 0, v2_pos = 0;
   *result = 0.0;
-  for(int i = 0, count = v1->header.count; i < count; i++)
-    *result += powf(v1->values[i].value - v2->values[i].value, 2);
+  
+  // TODO: change loop condition so we don't need the 'catch up' loop below
+  while(v1_pos < v1_count && v2_pos < v2_count) {
+    if(v1->values[v1_pos].index == v2->values[v2_pos].index) {
+      *result += powf(v1->values[v1_pos].value - v2->values[v2_pos].value, 2);
+      v1_pos++;
+      v2_pos++;
+    } else if(v1->values[v1_pos].index < v2->values[v2_pos].index) {
+      *result += powf(v1->values[v1_pos].value, 2);
+      v1_pos++;
+    } else {
+      *result += powf(v2->values[v2_pos].value, 2);
+      v2_pos++;
+    }
+  }
+  
+  // if the length of the vectors is uneven, 'catch up' the remainder
+  // of the longer vector here
+  if(v1_pos < v1_count) {
+    for(; v1_pos < v1_count; v1_pos++)
+      *result += powf(v1->values[v1_pos].value, 2);
+  } else if(v2_pos < v2_count) {
+    for(; v2_pos < v2_count; v2_pos++)
+      *result += powf(v2->values[v2_pos].value, 2);
+  }
+  
   *result = sqrtf(*result);
   return NO_ERROR;
 }
