@@ -19,7 +19,8 @@ char *learner_error_codes[] = {
   "Index out of range",
   "Vectors are not of equal length",
   "Values of the supplied vector are missing",
-  "There is no value at index in this sparse vector"
+  "There is no value at index in this sparse vector",
+  "Communication error. Check the log file for more information"
 };
 
 // ------------------------------------------

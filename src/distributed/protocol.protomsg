@@ -1,0 +1,10 @@
+request {
+    int operation
+    raw reference
+    raw data
+}
+
+response {
+    int code
+    raw data
+}
