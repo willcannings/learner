@@ -1,5 +1,6 @@
 #include "distributed/server/server.h"
 #include "core/logging.h"
+#include "learner.h"
 
 static TCHDB *db;
 int server = 0;
@@ -7,11 +8,9 @@ int client = 0;
 
 void cleanup() {
   note("Preparing to quit... cleaning up");
-
   if(!tchdbclose(db))
     fatal_with_format("Error closing the database: %s", tchdberrmsg(tchdbecode(db)));
   tchdbdel(db);
-
   note("Exiting");
   exit(0);
 }
@@ -21,6 +20,9 @@ int main(void) {
   learner_request  *req = NULL;
   learner_response *res = NULL;
   int error = 0;
+  
+  // initialise learner logging
+  learner_initialize();
   
   // before starting, install the cleanup signal handler
   signal(SIGQUIT, cleanup);
@@ -49,7 +51,5 @@ int main(void) {
       warn_with_format("Error reading request from client: %i", error);
       continue;
     }
-    
-    
   }
 }

@@ -11,7 +11,7 @@ learner_error learner_initialize() {
     fprintf(stderr, "Failed to create logging_lock, error: %i\n", error);
     exit(1);
   }
-  set_learner_logging_level(DEBUG);
+  set_learner_logging_level(NOTE);
   learner_logging_file = stderr;
   return NO_ERROR;
 }
