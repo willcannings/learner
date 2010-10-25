@@ -1,5 +1,3 @@
-#include <pthread.h>
-
 #ifndef __learner_errors__
 #define __learner_errors__
 
@@ -12,7 +10,9 @@ typedef enum {
   VECTORS_NOT_OF_EQUAL_LENGTH,
   MISSING_VALUES,
   INDEX_NOT_FOUND,
-  COMMUNICATION_ERROR
+  COMMUNICATION_ERROR,
+  UNKNOWN_OPERATION,
+  NAME_MISSING
 } learner_error;
 
 #endif

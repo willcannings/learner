@@ -11,16 +11,17 @@
 // ------------------------------------------
 // errors
 // ------------------------------------------
-pthread_key_t learner_error_key;
 char *learner_error_codes[] = {
-  "No error",
-  "Invalid length",
-  "Missing vector",
-  "Index out of range",
-  "Vectors are not of equal length",
-  "Values of the supplied vector are missing",
-  "There is no value at index in this sparse vector",
-  "Communication error. Check the log file for more information"
+  "no error",
+  "invalid length",
+  "missing vector",
+  "index out of range",
+  "vectors are not of equal length",
+  "values of the supplied vector are missing",
+  "there is no value at index in this sparse vector",
+  "communication error - check the log file for more information",
+  "unknown distributed operation requested",
+  "an operation requiring a name was requested, but no name was provided"
 };
 
 // ------------------------------------------
@@ -34,6 +35,29 @@ char *learner_logging_level_names[] = {
   " NOTE ",
   " WARN ",
   " FATAL "
+};
+
+// ------------------------------------------
+// distributed api
+// ------------------------------------------
+char *learner_operation_names[] = {
+  "get",
+  "set",
+  "delete"
+};
+
+char *learner_item_names[] = {
+  "key/value",
+  "matrix",
+  "row",
+  "column",
+  "cell"
+};
+
+char *learner_attribute_names[] = {
+  "value",
+  "name",
+  "index"
 };
 
 #endif

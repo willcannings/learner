@@ -1,0 +1,15 @@
+learner_request {
+    int operation
+    int item
+    int attribute
+    int matrix
+    int row
+    int column
+    raw name
+    raw data
+}
+
+learner_response {
+    int code
+    raw data
+}

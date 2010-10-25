@@ -49,7 +49,7 @@ learner_error set_learner_logging_file(char *path) {
 }
 
 
-void log_msg(learner_logging_level level, char *description) {
+void learner_log_msg(learner_logging_level level, char *description) {
   // ignore the notice if it's below what's being logged
   if(level < current_learner_logging_level)
     return;
