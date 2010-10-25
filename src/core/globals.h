@@ -21,7 +21,9 @@ char *learner_error_codes[] = {
   "there is no value at index in this sparse vector",
   "communication error - check the log file for more information",
   "unknown distributed operation requested",
-  "an operation requiring a name was requested, but no name was provided"
+  "an operation requiring a name was requested, but no name was provided",
+  "database error",
+  "unknown key"
 };
 
 // ------------------------------------------
