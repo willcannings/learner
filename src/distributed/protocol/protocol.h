@@ -1,8 +1,8 @@
 #include <sys/types.h>
-#include "distributed/response_message.h"
-#include "distributed/request_message.h"
-#include "distributed/protomsg.h"
-#include "structures/sparse_vector"
+#include "distributed/protocol/learner_response_message.h"
+#include "distributed/protocol/learner_request_message.h"
+#include "distributed/protocol/protomsg.h"
+#include "structures/sparse_vector.h"
 #include "core/errors.h"
 
 #ifndef __learner_protocol__
@@ -37,6 +37,7 @@ typedef enum {
 } learner_attribute;
 extern char *learner_attribute_names[];
 
+
 // ------------------------------------------
 // API
 // ------------------------------------------
@@ -49,6 +50,7 @@ learner_error set_key_value(void *key, long long key_length, void *value, long l
 learner_error get_key_value(void *key, long long key_length, void **value, long long *value_length);
 learner_error delete_key_value(void *key, long long key_length);
 
+/*
 // matrix operations
 learner_error get_matrix_index(void *name, long long length, long long *index);
 learner_error get_matrix_name(long long matrix, void **name, long long *length);
@@ -77,4 +79,5 @@ learner_error delete_column_value(long long matrix, long long column);
 learner_error delete_cell_value(long long matrix, long long row, long long column);
 learner_error delete_row_name(long long matrix, long long row);
 learner_error delete_column_name(long long matrix, long long column);
+*/
 #endif

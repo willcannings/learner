@@ -6,6 +6,6 @@
 #include "structures/vector.h"
 #include "structures/sparse_vector.h"
 
-void learner_initialize();
+learner_error learner_initialize();
 
 #endif

@@ -6,7 +6,7 @@
 
 learner_error learner_initialize() {
   // initialise logging
-  error = pthread_mutex_init(&logging_lock, NULL);
+  int error = pthread_mutex_init(&logging_lock, NULL);
   if(error) {
     fprintf(stderr, "Failed to create logging_lock, error: %i\n", error);
     exit(1);

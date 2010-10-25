@@ -1,21 +1,64 @@
-#include "distributed/protocol.h"
+#include "distributed/protocol/protocol.h"
 #include "core/logging.h"
 
 // ------------------------------------------
 // miscellaneous
 // ------------------------------------------
-void log_request(learner_request *request, learner_logging_level level) {
-  if(current_learner_logging_level > level)
+void log_request(learner_request *request) {
+  if(current_learner_logging_level > DEBUG)
     return;
   
   learner_request_header *req = request->header;
-  char *operation = learner_operation_names(req->operation);
-  char *item = learner_item_names(req->item);
-  char *attribute = learner_attribute_names(req->attribute);
-  learner_log_with_format(level, "Sending request %s %s %s");
+  char *operation = learner_operation_names[req->operation];
+  char *item = learner_item_names[req->item];
+  char *attribute = learner_attribute_names[req->attribute];
   
-  if(req->item == KEY_VALUE) {
-    learner_log_with_format("name length: %i", req->name_length);
+  // delete operations don't operate on an attribute
+  if(req->operation != DELETE) {
+    debug_with_format("Sending request %s %s %s", operation, item, attribute);
+  } else {
+    debug_with_format("Sending request %s %s", operation, item);
+  }
+  
+  // row, column and cell operations
+  if(req->item != MATRIX && req->item != KEY_VALUE) {
+    if(req->attribute == INDEX) {
+      debug_with_format("matrix: %i, name length: %i", req->matrix, req->name_length);
+
+    } else if(req->operation == SET && req->attribute == NAME) {
+      if(req->item == ROW) {
+        debug_with_format("matrix: %i, row: %i, name length: %i", req->matrix, req->row, req->name_length);
+      } else {
+        debug_with_format("matrix: %i, column: %i, name length: %i", req->matrix, req->column, req->name_length);
+      }
+      
+    } else {
+      if(req->item == ROW) {
+        debug_with_format("matrix: %i, row: %i", req->matrix, req->row);
+      } else if(req->item == COLUMN) {
+        debug_with_format("matrix: %i, column: %i", req->matrix, req->column);
+      } else {
+        debug_with_format("matrix: %i, row: %i, column: %i", req->matrix, req->row, req->column);
+      }
+    }
+    
+  // key/value operations
+  } else if(req->item == KEY_VALUE) {
+    if(req->operation == SET) {
+      debug_with_format("name length: %i, value length: %i", req->name_length, req->data_length);
+    } else {
+      debug_with_format("name length: %i", req->name_length);
+    }
+  
+  // matrix operations
+  } else if(req->item == MATRIX) {
+    if(req->operation == DELETE || (req->operation == GET && req->attribute == NAME)) {
+      debug_with_format("matrix: %i", req->matrix);
+    } else if(req->attribute == INDEX) {
+      debug_with_format("name length: %i", req->name_length);
+    } else if(req->operation == SET && req->attribute == NAME) {
+      debug_with_format("matrix: %i, name length: %i", req->matrix, req->name_length);
+    }
   }
 }
 
@@ -30,7 +73,7 @@ learner_error add_server(char *host, int weight) {
   int new_socket = 0, error = 0;
   connect_to_server(host, 3579, new_socket, error);
   if(error) {
-    warn_with_string_and_int("Error connecting to server '%s': %i", host, error);
+    warn_with_format("Error connecting to server '%s': %i", host, error);
     return COMMUNICATION_ERROR;
   }
   
@@ -44,11 +87,11 @@ learner_error add_server(char *host, int weight) {
 unsigned long long hash_name(void *name, long long length) {
   unsigned long long hash = 5381;
   for(long long i = 0; i < length; i++)
-    hash = ((hash << 5) + hash) + name[i];
+    hash = ((hash << 5) + hash + ((char *)name)[i]);
   return hash;
 }
 
-// deterministicly select a server from the pool to field a request
+// deterministically select a server from the pool to field a request
 learner_error server_for(learner_request *request, int *server) {
   learner_request_header *req = request->header;
   if(req->matrix < 0) return INDEX_OUT_OF_RANGE;
@@ -84,48 +127,72 @@ learner_error server_for(learner_request *request, int *server) {
 // ------------------------------------------
 learner_error _send_request(learner_request *req, learner_response *res) {
   int error = 0, server = 0;
-  res = NULL;
   
   // find the appropriate server
-  log_request(req, DEBUG);
+  if(current_learner_logging_level == DEBUG)
+    log_request(req);
   error = server_for(req, &server);
   debug_with_format("to server: %i", server);
   if(error) {
     warn_with_error("Failure in server_for", error);
     return error;
   }
-}
-
-learner_error _delete_operation(learner_request *req) {
-  learner_response *res = NULL;
-  int error = 0, server = 0;
   
-  // find the appropriate server
-  error = server_for(req, &server);
+  // write request
+  debug("Sending request");
+  write_learner_request(req, server, error);
   if(error) {
-    warn_with_error("Failure in server_for", error);
-    return error;
-  }
-
-  // write the request
-  write_request(req, server, error);
-  if(error) {
-    warn_with_int("Error sending request to server in _delete_operation: %i", error);
+    warn_with_format("Error sending request to server: %i", error);
     return COMMUNICATION_ERROR;
   }
   
   // wait for a response
-  read_response(res, server, error);
+  debug("Reading response");
+  read_learner_response(res, server, error);
   if(error) {
-    warn_with_int("Error receiving response from server in _delete_operation: %i", error);
-    free_learner_response(res);
+    warn_with_format("Error receiving response from server: %i", error);
     return COMMUNICATION_ERROR;
   }
   
+  debug("Request complete");
+  free_learner_request(req);
+  return NO_ERROR;
+}
+
+learner_error _null_response_operation(learner_request *req) {
+  learner_response *res = NULL;
+  int error = 0, code = 0;
+  
+  error = _send_request(req, res);
+  if(error) {
+    free_learner_response(res);
+    return error;
+  }
+  
   // successful request, return the response code
-  error = get_learner_response_code(res);
+  code = get_learner_response_code(res);
   free_learner_response(res);
-  return error;
+  return code;
+}
+
+learner_error _response_operation(learner_request *req, void **data, long long *length) {
+  learner_response *res = NULL;
+  int error = 0, code = 0;
+  
+  error = _send_request(req, res);
+  if(error) {
+    free_learner_response(res);
+    return error;
+  }
+  
+  // set references to the data section
+  *data = get_learner_response_data(res);
+  *length = learner_response_data_length(res);
+  
+  // successful request, return the response code
+  code = get_learner_response_code(res);
+  free_learner_response_structure(res);
+  return code;
 }
 
 
@@ -133,74 +200,29 @@ learner_error _delete_operation(learner_request *req) {
 // key/value operations
 // ------------------------------------------
 learner_error set_key_value(void *key, long long key_length, void *value, long long value_length) {
-  
+  learner_request *req = NULL;
+  init_learner_request(req);
+  set_learner_request_operation(req, SET);
+  set_learner_request_item(req, KEY_VALUE);
+  set_learner_request_name(req, key, key_length);
+  set_learner_request_data(req, value, value_length);
+  return _null_response_operation(req);
 }
 
 learner_error get_key_value(void *key, long long key_length, void **value, long long *value_length) {
-  
+  learner_request *req = NULL;
+  init_learner_request(req);
+  set_learner_request_operation(req, GET);
+  set_learner_request_item(req, KEY_VALUE);
+  set_learner_request_name(req, key, key_length);
+  return _response_operation(req, value, value_length);
 }
 
 learner_error delete_key_value(void *key, long long key_length) {
-  
-}
-
-
-learner_error index_by_name(Reference *ref, index_t *index) {
-  request   *req = NULL;
-  response  *res = NULL;
-  int       error = 0, server = 0;
-  
-  // create the request
-  init_request(req);
-  set_request_operation(req, GET);
-  set_request_reference(req, ref, sizeof_reference(ref));
-  set_request_data(req, ref->reference->name->buffer, ref->reference->name->length)
-  
-  // send to the appropriate server
-  error = server_for(req, &server);
-  if(error) {
-    warn_with_error("Failure in server_for called from index_reference_from_name", error);
-    return error;
-  }
-  write_request(req, server, error);
-  if(error) {
-    warn_with_int("Error sending request to server in index_reference_from_name: %i", error);
-    return COMMUNICATION_ERROR;
-  }
-  
-  // wait for a response
-  read_response(res, server, error);
-  if(error) {
-    warn_with_int("Error receiving response from server in index_reference_from_name: %i", error);
-    return COMMUNICATION_ERROR;
-  }
-  if(get_response_code(res) == NO_ERROR) {
-    *index = *((index_ref *)get_response_data(res));
-    return NO_ERROR;
-  } else {
-    note_with_error("Error received from server in response to index_reference_from_name", error);
-    return error;
-  }
-}
-
-learner_error row_index_by_name(index_t matrix, name_t name, int name_length, index_t *row) {
-  Reference ref;
-  int error = 0;
-  
-  ref.matrix = matrix;
-  ref.type = ROW_INDEX_BY_NAME;
-  ref.reference.name.length = name_length;
-  ref.reference.name.buffer = name;  
-  return index_by_name(&ref, row);
-}
-
-learner_error column_index_by_name(index_t matrix, name_t name, int name_length, index_t *column) {
-  Reference ref;
-  int error = 0;
-  
-  ref.matrix = matrix;
-  ref.type = COLUMN_INDEX_BY_NAME;
-  ref.reference.name.length = name_length;
-  ref.reference.name.buffer = name;  
-  return index_by_name(&ref, column);
+  learner_request *req = NULL;
+  init_learner_request(req);
+  set_learner_request_operation(req, DELETE);
+  set_learner_request_item(req, KEY_VALUE);
+  set_learner_request_name(req, key, key_length);
+  return _null_response_operation(req);
 }
