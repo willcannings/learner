@@ -63,7 +63,7 @@ void learner_log_msg(learner_logging_level level, char *description) {
   // attempt to write the log entry
   time_t current_time = time(NULL);
   struct tm *t = localtime(&current_time);
-  int bytes = fprintf(learner_logging_file, "%d/%.2d/%.2d %.2d:%.2d:%.2d%s: %s\n", t->tm_year, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, learner_logging_level_names[level], description);
+  int bytes = fprintf(learner_logging_file, "%d/%.2d/%.2d %.2d:%.2d:%.2d%s: %s\n", 1900 + t->tm_year, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, learner_logging_level_names[level], description);
   
   // if writing failed, we have a fatal condition
   if(bytes < 0) {

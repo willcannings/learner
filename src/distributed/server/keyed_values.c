@@ -16,8 +16,6 @@ learner_error get_keyed_value(TCHDB *db, learner_request *req, learner_response 
     warn_with_format("Database error from get_keyed_value: %s", tchdberrmsg(tchdbecode(db)));
     set_learner_response_code(res, UNKNOWN_KEY);
   }
-  
-  free_learner_request(req);
   return NO_ERROR;
 }
 
@@ -34,8 +32,6 @@ learner_error set_keyed_value(TCHDB *db, learner_request *req, learner_response 
     warn_with_format("Database error from set_keyed_value: %s", tchdberrmsg(tchdbecode(db)));
     set_learner_response_code(res, DATABASE_ERROR);
   }
-  
-  free_learner_request(req);
   return NO_ERROR;
 }
 
@@ -50,7 +46,5 @@ learner_error delete_keyed_value(TCHDB *db, learner_request *req, learner_respon
     warn_with_format("Database error from delete_keyed_value: %s", tchdberrmsg(tchdbecode(db)));
     set_learner_response_code(res, DATABASE_ERROR);
   }
-  
-  free_learner_request(req);
   return NO_ERROR;
 }

@@ -125,8 +125,9 @@ learner_error server_for(learner_request *request, int *server) {
 // ------------------------------------------
 // generic internal API helpers
 // ------------------------------------------
-learner_error _send_request(learner_request *req, learner_response *res) {
+learner_error _send_request(learner_request *req, learner_response **response) {
   int error = 0, server = 0;
+  learner_response *res = NULL;
   
   // find the appropriate server
   if(current_learner_logging_level == DEBUG)
@@ -155,7 +156,8 @@ learner_error _send_request(learner_request *req, learner_response *res) {
   }
   
   debug("Request complete");
-  free_learner_request(req);
+  free_learner_request_structure(req);
+  *response = res;
   return NO_ERROR;
 }
 
@@ -163,7 +165,7 @@ learner_error _null_response_operation(learner_request *req) {
   learner_response *res = NULL;
   int error = 0, code = 0;
   
-  error = _send_request(req, res);
+  error = _send_request(req, &res);
   if(error) {
     free_learner_response(res);
     return error;
@@ -179,7 +181,7 @@ learner_error _response_operation(learner_request *req, void **data, long long *
   learner_response *res = NULL;
   int error = 0, code = 0;
   
-  error = _send_request(req, res);
+  error = _send_request(req, &res);
   if(error) {
     free_learner_response(res);
     return error;

@@ -5,10 +5,11 @@ test: test_sparse_vector.o test_vector.o tests/test_learner.c
 	$(CC) $(CFLAGS) tests/test_learner.c obj/test_sparse_vector.o obj/test_vector.o obj/logging.o obj/learner.o obj/sparse_vector.o obj/vector.o -o bin/run_tests
 	./bin/run_tests
 
-
 server: client.o server.o keyed_values.o
 	$(CC) $(CFLAGS) obj/client.o obj/server.o obj/keyed_values.o obj/learner.o obj/logging.o -ltokyocabinet -o bin/server
 
+client_test: client.o tests/client_test.c
+	$(CC) $(CFLAGS) tests/client_test.c obj/client.o obj/learner.o obj/logging.o -o bin/client_test
 
 # core
 core_headers: src/core/errors.h src/core/globals.h src/core/logging.h src/learner.h
