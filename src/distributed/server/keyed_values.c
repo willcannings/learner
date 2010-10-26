@@ -1,7 +1,7 @@
 #include "distributed/server/server.h"
 #include "core/logging.h"
 
-learner_error get_keyed_value(TCHDB *db, learner_request *req, learner_response *res) {
+learner_error handle_get_key_value(learner_request *req, learner_response *res) {
   const void *name = (const void *) get_learner_request_name(req);
   int name_length = (int) learner_request_name_length(req);
   
@@ -20,7 +20,7 @@ learner_error get_keyed_value(TCHDB *db, learner_request *req, learner_response 
 }
 
 
-learner_error set_keyed_value(TCHDB *db, learner_request *req, learner_response *res) {
+learner_error handle_set_key_value(learner_request *req, learner_response *res) {
   const void *name = (const void *) get_learner_request_name(req);
   int name_length = (int) learner_request_name_length(req);
   const void *value = (const void *) get_learner_request_data(req);
@@ -36,7 +36,7 @@ learner_error set_keyed_value(TCHDB *db, learner_request *req, learner_response 
 }
 
 
-learner_error delete_keyed_value(TCHDB *db, learner_request *req, learner_response *res) {
+learner_error handle_delete_key_value(learner_request *req, learner_response *res) {
   const void *name = (const void *) get_learner_request_name(req);
   int name_length = (int) learner_request_name_length(req);
   
