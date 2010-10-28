@@ -1,8 +1,7 @@
 #include <pthread.h>
 #include <stdio.h>
+#include <errno.h>
 #include "core/errors.h"
-
-// TODO: make the macros short circuit if the current log level is above the message level
 
 #ifndef __learner_logging__
 #define __learner_logging__
@@ -41,7 +40,7 @@ void learner_log_msg(learner_logging_level level, char *description);
     char *_log_message = NULL;\
     int _log_err = asprintf(&_log_message, format, __VA_ARGS__);\
     if(_log_err < 0) {\
-      learner_log_msg(FATAL, "FATAL: Unable to create memory after call to log_with_string_and_int");\
+      learner_log_msg(FATAL, "FATAL: Unable to create memory after call to learner_log_with_format");\
     }\
     learner_log_msg(level, _log_message);\
     free(_log_message);\
@@ -51,9 +50,21 @@ void learner_log_msg(learner_logging_level level, char *description);
 #define learner_log_with_error(level, description, err)  {\
   if(current_learner_logging_level <= level) {\
     char *_log_message = NULL;\
-    int _log_err = asprintf(&_log_message, "%s (%s)", description, learner_error_codes[err]);\
+    int _log_err = asprintf(&_log_message, "%s: %s", description, learner_error_codes[err]);\
     if(_log_err < 0) {\
-      learner_log_msg(FATAL, "FATAL: Unable to create memory after call to log_with_int");\
+      learner_log_msg(FATAL, "FATAL: Unable to create memory after call to learner_log_with_error");\
+    }\
+    learner_log_msg(level, _log_message);\
+    free(_log_message);\
+  }\
+}
+
+#define learner_log_with_errno(level, description)  {\
+  if(current_learner_logging_level <= level) {\
+    char *_log_message = NULL;\
+    int _log_err = asprintf(&_log_message, "%s: %s", description, strerror(errno));\
+    if(_log_err < 0) {\
+      learner_log_msg(FATAL, "FATAL: Unable to create memory after call to learner_log_with_errno");\
     }\
     learner_log_msg(level, _log_message);\
     free(_log_message);\
@@ -76,5 +87,10 @@ void learner_log_msg(learner_logging_level level, char *description);
 #define note_with_error(description,  err)  learner_log_with_error(NOTE,  description, err);
 #define warn_with_error(description,  err)  learner_log_with_error(WARN,  description, err);
 #define fatal_with_error(description, err)  learner_log_with_error(FATAL, description, err);
+
+#define debug_with_errno(description) learner_log_with_errno(DEBUG, description);
+#define note_with_errno(description)  learner_log_with_errno(NOTE,  description);
+#define warn_with_errno(description)  learner_log_with_errno(WARN,  description);
+#define fatal_with_errno(description) learner_log_with_errno(FATAL, description);
 
 #endif

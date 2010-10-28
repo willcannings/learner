@@ -5,8 +5,8 @@
 #include <stdlib.h>
 
 void process_thread_cleanup(void *param) {
-  if(param) {
-    if(*((int *)param))
+  if (param) {
+    if (*((int *)param))
       close(*((int *)param));
     free(param);
   }
@@ -21,27 +21,30 @@ void *process_thread(void *param) {
   int *current_client = (int *) malloc(sizeof(int));
   pthread_cleanup_push(process_thread_cleanup, (void *)current_client);
   *current_client = 0;
+  note("Process thread started");
   
   while(1) {
     // get the next client to process
     bytes = read(process_queue_reader, current_client, sizeof(int));
-    if(bytes != sizeof(int)) {
-      if(bytes == -1) {
-        fatal_with_format("Error reading from process queue: %s", strerror(errno));
-      } else {
-        fatal("Unexpected termination of process queue");
-      }
+    if (bytes != sizeof(int) && shutting_down) {
+      pthread_exit(NULL);
+    } else if (bytes == 0) {
+      pthread_exit(NULL);
+    } else if (bytes == -1) {
+      fatal_with_errno("Error reading from process queue");
+    } else if (bytes != sizeof(int)) {
+      fatal("Unexpected termination of process queue");
     }
     
     read_learner_request(req, *current_client, error);
-    if(error) {
-      warn_with_format("Error reading request from client: %s", strerror(error));
+    if (error) {
+      warn_with_errno("Error reading request from client");
       close(*current_client);
       continue;
     }
     
     init_learner_response(res);
-    switch(get_learner_request_item(req)) {
+    switch (get_learner_request_item(req)) {
       case KEY_VALUE:
         debug("Key value request");
         switch(get_learner_request_operation(req)) {
@@ -79,6 +82,17 @@ void *process_thread(void *param) {
     free_learner_response(res);
     res = NULL;
     debug("Completed request");
+    
+    // move the client back to the read queue
+    bytes = write(read_queue_writer, current_client, sizeof(int));
+    if (bytes == 0) {
+      warn("Read queue has closed. Process thread shutting down.");
+      pthread_exit(NULL);
+    } else if (bytes == -1) {
+      fatal_with_errno("Unable to write client socket file descriptor back to read queue");
+    } else if (bytes != sizeof(int)) {
+      fatal_with_format("Unable to write complete socket file descriptor back to read queue. Wrote: %i", bytes);
+    }
   }
   
   pthread_cleanup_pop(1);
