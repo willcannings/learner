@@ -30,7 +30,6 @@
 #ifdef LEARNER_KQUEUE
   void add_socket_to_queue(int queue, int socket, uint16_t extra_flags) {
     struct kevent change;
-    memset(&change, 0, sizeof(struct kevent));
     EV_SET(&change, socket, EVFILT_READ, EV_ADD | extra_flags, 0, 0, NULL);
     if(kevent(queue, &change, 1, NULL, 0, NULL) == -1) {
       fatal_with_errno("Unable to add a socket to the kqueue");
@@ -39,6 +38,14 @@
 #endif
 
 #ifdef LEARNER_EPOLL
+  void add_socket_to_queue(int queue, int socket, uint16_t extra_flags) {
+    struct epoll_event change;
+    change.events = EPOLLIN | EPOLLRDHUP | EPOLLERR | EPOLLHUP | extra_flags;
+    change.data.fd = socket;
+    if (epoll_ctl(queue, EPOLL_CTL_ADD, socket, &change) == -1) {
+      fatal_with_errno("Unable to add a socket to the epoll queue");
+    }
+  }
 #endif
 
 #ifdef LEARNER_POLL
@@ -110,54 +117,80 @@ void close_client_connection(int socket) {
 // event loop
 // ------------------------------------------
 void *read_thread(void *param) {
-  int error = 0;
-  
   #ifdef LEARNER_KQUEUE
-    int events = 0, client_socket = 0;
     int queue = kqueue();
-    struct kevent change;
     struct kevent event;
-    
-    // initialise the kqueue
-    if (queue == -1) {
-      fatal_with_errno("Unable to create a new kqueue object");
-    }
-    
-    // add the queue socket to the queue
-    add_socket_to_queue(queue, read_queue_reader, 0);
-    note("Read thread started");
-    
-    while(1) {
-      // FIXME: for now, we only monitor one event change at a time
-      memset(&event, 0, sizeof(struct kevent));
-      
-      // block in kevent until a socket is available for reading
-      events = kevent(queue, NULL, 0, &event, 1, NULL);
-      if (events == -1 || event.flags == EV_ERROR) {
-        fatal_with_errno("kevent failed in read thread");
-      }
-      
-      // the socket used for the queue is available to read
-      if (event.ident == read_queue_reader) {
-        if (event.flags == EV_EOF) {
-          pthread_exit(NULL);
-        } else if (event.data == sizeof(int)) {
-          client_socket = read_client_from_queue();
-          add_socket_to_queue(queue, client_socket, EV_ONESHOT);
-        }
-      } else {
-        if (event.flags == EV_EOF) {
-          close_client_connection(event.ident);
-        } else {
-          add_client_to_process_queue(event.ident);
-        }
-      }
-    }
   #endif
-  
   #ifdef LEARNER_EPOLL
+    int queue = epoll_create(EPOLL_SIZE);
+    struct epoll_event event;
   #endif
+  int events = 0, fd = 0, eof = 0;
+    
+  if (queue == -1) {
+    fatal_with_errno("Unable to create a new kqueue object");
+  }
+    
+  // add the read queue socket to the queue
+  add_socket_to_queue(queue, read_queue_reader, 0);
+  note("Read thread started");
+    
+  while(1) {
+    // FIXME: for now, we only monitor one event change at a time
+    // block until a socket is available for reading
+    #ifdef LEARNER_KQUEUE
+      events = kevent(queue, NULL, 0, &event, 1, NULL);
+    #endif
+    #ifdef LEARNER_EPOLL
+      events = epoll_wait(queue, &event, 1, -1);
+    #endif
+    
+    // handle errors
+    if (events == -1) {
+      fatal_with_errno("Error waiting for the read thread queue");
+    }
+    
+    // the socket used for the queue is available to read
+    #ifdef LEARNER_KQUEUE
+      fd = event.ident;
+      eof = (event.flags & EV_EOF) || (event.flags & EV_ERROR);
+    #endif
+    #ifdef LEARNER_EPOLL
+      fd = event.data.fd;
+      eof = (event.events & EPOLLRDHUP) || (event.events & EPOLLERR) || (event.events & EPOLLHUP)
+    #endif
+    
+    if (fd == read_queue_reader) {
+      if (eof) {
+        pthread_exit(NULL);
+      } else {
+        #ifdef LEARNER_KQUEUE
+           if (event.data != sizeof(int)) {
+             continue;
+            }
+        #endif
+        
+        fd = read_client_from_queue();
+        
+        #ifdef LEARNER_KQUEUE
+          add_socket_to_queue(queue, fd, EV_ONESHOT);
+        #endif
+        #ifdef LEARNER_EPOLL
+          add_socket_to_queue(queue, fd, 0);
+        #endif
+      }
+    } else {
+      if (eof) {
+        close_client_connection(fd);
+      } else {
+        add_client_to_process_queue(fd);
+        #ifdef LEARNER_EPOLL
+          if (epoll_ctl(queue, EPOLL_CTL_DEL, fd, NULL) == -1) {
+            fatal_with_errno("Unable to remove client socket from the epoll queue");
+          }
+        #endif
+      }
+    }
+  }
   
-  #ifdef LEARNER_POLL
-  #endif  
 }

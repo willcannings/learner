@@ -10,6 +10,7 @@
 #define ACCEPT_BACKLOG  10
 #define READ_THREADS    1
 #define PROCESS_THREADS 8
+#define EPOLL_SIZE      20
 
 // from globals.h
 extern TCHDB *db;
