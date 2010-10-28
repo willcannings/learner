@@ -157,7 +157,7 @@ void *read_thread(void *param) {
     #endif
     #ifdef LEARNER_EPOLL
       fd = event.data.fd;
-      eof = (event.events & EPOLLRDHUP) || (event.events & EPOLLERR) || (event.events & EPOLLHUP)
+      eof = (event.events & EPOLLRDHUP) || (event.events & EPOLLERR) || (event.events & EPOLLHUP);
     #endif
     
     if (fd == read_queue_reader) {

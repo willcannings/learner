@@ -1,8 +1,8 @@
-CFLAGS=-std=c99 -I src
+CFLAGS=-std=c99 -I src -D_GNU_SOURCE
 CC=gcc
 
 test: test_sparse_vector.o test_vector.o tests/test_learner.c
-	$(CC) $(CFLAGS) tests/test_learner.c obj/test_sparse_vector.o obj/test_vector.o obj/logging.o obj/learner.o obj/sparse_vector.o obj/vector.o -o bin/run_tests
+	$(CC) $(CFLAGS) tests/test_learner.c obj/test_sparse_vector.o obj/test_vector.o obj/logging.o obj/learner.o obj/sparse_vector.o obj/vector.o -lm -o bin/run_tests
 	./bin/run_tests
 
 server: client.o server.o keyed_values.o read_thread.o process_thread.o

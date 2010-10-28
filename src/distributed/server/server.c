@@ -4,6 +4,7 @@
 #include "learner.h"
 #include <pthread.h>
 #include <string.h>
+#include <signal.h>
 #include <tcutil.h>
 #include <tchdb.h>
 
