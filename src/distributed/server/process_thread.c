@@ -29,6 +29,7 @@ void *process_thread(void *param) {
     if (bytes != sizeof(int) && shutting_down) {
       pthread_exit(NULL);
     } else if (bytes == 0) {
+      note("Process queue has closed. Process thread shutting down.");
       pthread_exit(NULL);
     } else if (bytes == -1) {
       fatal_with_errno("Error reading from process queue");
@@ -38,9 +39,13 @@ void *process_thread(void *param) {
     
     read_learner_request(req, *current_client, error);
     if (error) {
-      warn_with_errno("Error reading request from client");
-      close(*current_client);
-      continue;
+      if(shutting_down) {
+        pthread_exit(NULL);
+      } else {
+        warn_with_errno("Error reading request from client");
+        close(*current_client);
+        continue;
+      }
     }
     
     init_learner_response(res);
@@ -85,8 +90,10 @@ void *process_thread(void *param) {
     
     // move the client back to the read queue
     bytes = write(read_queue_writer, current_client, sizeof(int));
-    if (bytes == 0) {
-      warn("Read queue has closed. Process thread shutting down.");
+    if (bytes != sizeof(int) && shutting_down) {
+      pthread_exit(NULL);
+    } else if (bytes == 0) {
+      note("Read queue has closed. Process thread shutting down.");
       pthread_exit(NULL);
     } else if (bytes == -1) {
       fatal_with_errno("Unable to write client socket file descriptor back to read queue");
