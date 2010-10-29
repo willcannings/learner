@@ -26,15 +26,17 @@ void *process_thread(void *param) {
   while(1) {
     // get the next client to process
     bytes = read(process_queue_reader, current_client, sizeof(int));
-    if (bytes != sizeof(int) && shutting_down) {
-      pthread_exit(NULL);
-    } else if (bytes == 0) {
-      note("Process queue has closed. Process thread shutting down.");
-      pthread_exit(NULL);
-    } else if (bytes == -1) {
-      fatal_with_errno("Error reading from process queue");
-    } else if (bytes != sizeof(int)) {
-      fatal("Unexpected termination of process queue");
+    if (bytes != sizeof(int)) {
+      if (shutting_down) {
+        pthread_exit(NULL);
+      } else if (bytes == 0) {
+        note("Process queue has closed. Process thread shutting down.");
+        pthread_exit(NULL);
+      } else if (bytes == -1) {
+        fatal_with_errno("Error reading from process queue");
+      } else {
+        fatal("Unexpected termination of process queue");
+      }
     }
     
     read_learner_request(req, *current_client, error);
@@ -52,7 +54,7 @@ void *process_thread(void *param) {
     switch (get_learner_request_item(req)) {
       case KEY_VALUE:
         debug("Key value request");
-        switch(get_learner_request_operation(req)) {
+        switch (get_learner_request_operation(req)) {
           case SET:
             error = handle_set_key_value(req, res);
             break;
@@ -64,24 +66,35 @@ void *process_thread(void *param) {
             break;
         }
         break;
+        
       case MATRIX:
+        debug("Matrix request");
         break;
+        
       case ROW:
+        debug("Row request");
         break;
       case COLUMN:
+        debug("Column request");
         break;
+        
       case CELL:
+        debug("Cell request");
         break;
     }
-    
-    // free the request object
-    free(req->name);
-    free_learner_request_structure(req);
-    req = NULL;
     
     // write the response
     debug("Writing response");
     write_learner_response(res, *current_client, error);
+    if (error) {
+      if (shutting_down) {
+        pthread_exit(NULL);
+      } else {
+        warn_with_errno("Unable to write complete response to client");
+        close(*current_client);
+        continue;
+      }
+    }
     
     // free the response and finish
     free_learner_response(res);
@@ -90,15 +103,17 @@ void *process_thread(void *param) {
     
     // move the client back to the read queue
     bytes = write(read_queue_writer, current_client, sizeof(int));
-    if (bytes != sizeof(int) && shutting_down) {
-      pthread_exit(NULL);
-    } else if (bytes == 0) {
-      note("Read queue has closed. Process thread shutting down.");
-      pthread_exit(NULL);
-    } else if (bytes == -1) {
-      fatal_with_errno("Unable to write client socket file descriptor back to read queue");
-    } else if (bytes != sizeof(int)) {
-      fatal_with_format("Unable to write complete socket file descriptor back to read queue. Wrote: %i", bytes);
+    if (bytes != sizeof(int)) {
+      if (shutting_down) {
+        pthread_exit(NULL);
+      } else if (bytes == 0) {
+        note("Read queue has closed. Process thread shutting down.");
+        pthread_exit(NULL);
+      } else if (bytes == -1) {
+        fatal_with_errno("Unable to write client socket file descriptor back to read queue");
+      } else {
+        fatal_with_format("Unable to write complete socket file descriptor back to read queue. Wrote: %i", bytes);
+      }
     }
   }
   

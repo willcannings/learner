@@ -121,6 +121,7 @@ learner_error read_configuration_file(char *path, learner_config *config) {
     #undef option
   }
   
+  free(data);
   return NO_ERROR;
 }
 

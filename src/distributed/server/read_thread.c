@@ -72,15 +72,17 @@ void read_thread_cleanup(void *fdset) {
 // add a client to the process queue
 void add_client_to_process_queue(int socket) {
   int bytes = write(process_queue_writer, &socket, sizeof(int));
-  if (bytes != sizeof(int) && shutting_down) {
-    pthread_exit(NULL);
-  } else if (bytes == 0) {
-    note("Process queue has closed. Reader thread shutting down.");
-    pthread_exit(NULL);
-  } else if (bytes == -1) {
-    fatal_with_errno("Unable to write client socket file descriptor to process queue");
-  } else if (bytes != sizeof(int)) {
-    fatal_with_format("Unable to write complete client socket file descriptor. Wrote: %i", bytes);
+  if (bytes != sizeof(int)) {
+    if (shutting_down) {
+      pthread_exit(NULL);
+    } else if (bytes == 0) {
+      note("Process queue has closed. Reader thread shutting down.");
+      pthread_exit(NULL);
+    } else if (bytes == -1) {
+      fatal_with_errno("Unable to write client socket file descriptor to process queue");
+    } else {
+      fatal_with_format("Unable to write complete client socket file descriptor. Wrote: %i", bytes);
+    }
   }
 }
 
@@ -88,18 +90,18 @@ void add_client_to_process_queue(int socket) {
 int read_client_from_queue() {
   int bytes = 0, client_socket = 0;
   bytes = read(read_queue_reader, &client_socket, sizeof(int));
-  
-  if (bytes != sizeof(int) && shutting_down) {
-    pthread_exit(NULL);
-  } else if (bytes == 0) {
-    note("Read queue has closed. Reader thread shutting down.");
-    pthread_exit(NULL);
-  } else if (bytes == -1) {
-    fatal_with_errno("Read thread unable to read from read queue");
-  } else if (bytes != sizeof(int)) {
-    fatal("Unable to read full client socket file descriptor");
+  if (bytes != sizeof(int)) {
+    if (shutting_down) {
+      pthread_exit(NULL);
+    } else if (bytes == 0) {
+      note("Read queue has closed. Reader thread shutting down.");
+      pthread_exit(NULL);
+    } else if (bytes == -1) {
+      fatal_with_errno("Read thread unable to read from read queue");
+    } else {
+      fatal("Unable to read full client socket file descriptor");
+    }
   }
-  
   return client_socket;
 }
 
