@@ -120,7 +120,7 @@ void *read_thread(void *param) {
     struct kevent event;
   #endif
   #ifdef LEARNER_EPOLL
-    int queue = epoll_create(EPOLL_SIZE);
+    int queue = epoll_create(config.epoll_size);
     struct epoll_event event;
   #endif
   int events = 0, fd = 0, eof = 0;
