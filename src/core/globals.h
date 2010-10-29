@@ -34,8 +34,8 @@ FILE                  *learner_logging_file;
 pthread_mutex_t       logging_lock;
 char *learner_logging_level_names[] = {
   " DEBUG ",
-  " NOTE ",
-  " WARN ",
+  " NOTE  ",
+  " WARN  ",
   " FATAL "
 };
 
