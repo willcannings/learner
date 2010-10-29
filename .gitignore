@@ -2,4 +2,4 @@
 *.o
 bin/*
 learner.db
-
+configure.h

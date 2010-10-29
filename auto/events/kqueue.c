@@ -3,4 +3,5 @@
 
 int main(void) {
   int queue = kqueue();
+  return 2;
 }

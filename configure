@@ -1,0 +1,85 @@
+#!/bin/sh
+
+# config
+HEADER="configure.h"
+ERRORS="configure_errors"
+
+# intro
+echo "Learner auto configuration"
+echo "// configuration generated" > $HEADER
+echo "//" `date` "\n" >> $HEADER
+
+# OS and Architecture
+echo "= Determining OS and Architecture..."
+LEARNER_OS=`uname -s 2>/dev/null`
+LEARNER_ARCH=`uname -m 2>/dev/null`
+echo "#define LEARNER_`echo $LEARNER_OS | tr "[:lower:]" "[:upper:]"`" >> $HEADER
+echo "#define LEARNER_`echo $LEARNER_ARCH | tr "[:lower:]" "[:upper:]"`" >> $HEADER
+echo "Building for $LEARNER_OS $LEARNER_ARCH"
+
+
+# Cores
+echo "= Determining number of cores..."
+case "$LEARNER_OS" in
+  'Darwin')
+    LEARNER_CORE_TEST="auto/cores/sysctl"
+    ;;
+  'Linux')
+    LEARNER_CORE_TEST="auto/cores/sysconf"
+    ;;
+esac
+
+if [ -n "$LEARNER_CORE_TEST" ]; then
+  cc "$LEARNER_CORE_TEST.c" -o "$LEARNER_CORE_TEST" >> $ERRORS 2>&1
+  if [ -x $LEARNER_CORE_TEST ]; then
+    LEARNER_CORES=`$LEARNER_CORE_TEST`
+    rm -f "$LEARNER_CORE_TEST"
+  else
+    echo "Unable to determine number of cores - core test program compilation failed"
+    LEARNER_CORES="1"
+  fi
+else
+  echo "Unable to determine number of cores - unknown OS"
+  LEARNER_CORES="1"
+fi
+
+echo "#define LEARNER_CORES $LEARNER_CORES" >> $HEADER
+echo "Configuring for $LEARNER_CORES cores"
+
+
+# Event system
+echo "= Determining which event system to use..."
+case "$LEARNER_OS" in
+  'Darwin')
+    LEARNER_EVENT_SYSTEM="kqueue"
+    ;;
+  'Linux')
+    LEARNER_EVENT_SYSTEM="epoll"
+    ;;
+  *)
+    LEARNER_EVENT_SYSTEM="unknown"
+    ;;
+esac
+LEARNER_FALLBACK_EVENT_SYSTEM="poll"
+
+cc "auto/events/$LEARNER_EVENT_SYSTEM.c" -o "auto/events/$LEARNER_EVENT_SYSTEM" >> $ERRORS 2>&1
+if [ -x "auto/events/$LEARNER_EVENT_SYSTEM" ]; then
+  rm -f "auto/events/$LEARNER_EVENT_SYSTEM"
+else
+  cc "auto/events/$LEARNER_FALLBACK_EVENT_SYSTEM.c" -o "auto/events/$LEARNER_FALLBACK_EVENT_SYSTEM" >> $ERRORS 2>&1
+  if [ -x "auto/events/$LEARNER_FALLBACK_EVENT_SYSTEM" ]; then
+    LEARNER_EVENT_SYSTEM="$LEARNER_FALLBACK_EVENT_SYSTEM"
+    rm -f "auto/events/$LEARNER_EVENT_SYSTEM"
+  else
+    echo "Unable to find an event system Learner can use (OS must support kqueue, epoll or poll)"
+    exit 1
+  fi
+fi
+
+echo "#define LEARNER_`echo $LEARNER_EVENT_SYSTEM | tr "[:lower:]" "[:upper:]"`" >> $HEADER
+echo "Selected $LEARNER_EVENT_SYSTEM"
+
+
+# complete
+rm -f $ERRORS
+echo "\nConfiguration complete"

@@ -4,8 +4,6 @@
 #include <string.h>
 #include <errno.h>
 
-#define LEARNER_KQUEUE
-
 // ------------------------------------------
 // includes
 // ------------------------------------------
