@@ -7,7 +7,8 @@ ERRORS="configure_errors"
 # intro
 echo "Learner auto configuration"
 echo "// configuration generated" > $HEADER
-echo "//" `date` "\n" >> $HEADER
+echo "//" `date` >> $HEADER
+echo "" >> $HEADER
 
 # OS and Architecture
 echo "= Determining OS and Architecture..."
@@ -82,4 +83,5 @@ echo "Selected $LEARNER_EVENT_SYSTEM"
 
 # complete
 rm -f $ERRORS
-echo "\nConfiguration complete"
+echo ""
+echo "Configuration complete"
