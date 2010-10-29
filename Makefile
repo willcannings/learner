@@ -1,6 +1,8 @@
-CFLAGS=-std=c99 -I src -D_GNU_SOURCE
+CFLAGS=-std=c99 -I src -D_GNU_SOURCE -include configure.h
 CC=gcc
 
+
+# programs
 test: test_sparse_vector.o test_vector.o tests/test_learner.c
 	$(CC) $(CFLAGS) tests/test_learner.c obj/test_sparse_vector.o obj/test_vector.o obj/logging.o obj/learner.o obj/sparse_vector.o obj/vector.o -lm -o bin/run_tests
 	./bin/run_tests
@@ -10,6 +12,14 @@ server: client.o server.o keyed_values.o read_thread.o process_thread.o
 
 client_test: client.o tests/client_test.c
 	$(CC) $(CFLAGS) tests/client_test.c obj/client.o obj/learner.o obj/logging.o -o bin/client_test
+
+# cleaning
+clean:
+	rm -rf bin/*
+	rm -rf obj/*
+	rm -f configure.h
+	rm -f configure_errors
+
 
 # core
 core_headers: src/core/errors.h src/core/globals.h src/core/logging.h src/learner.h
