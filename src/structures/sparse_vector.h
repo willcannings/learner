@@ -16,7 +16,7 @@ typedef struct {
   u_int8_t  frozen;
   float     magnitude;
   u_int32_t min_index;
-  u_int32_t max_index;  
+  u_int32_t max_index;
 } sparse_vector_header;
 
 typedef struct {
@@ -34,8 +34,8 @@ learner_error sparse_vector_frozen(SparseVector *vector, int *frozen);
 learner_error sparse_vector_unfreeze(SparseVector *vector);
 
 // getter & setter required because we don't have contiguous data
-learner_error sparse_vector_set(SparseVector *vector, int index, float value);
-learner_error sparse_vector_get(SparseVector *vector, int index, float *value);
+learner_error sparse_vector_set(SparseVector *vector, u_int32_t index, float value);
+learner_error sparse_vector_get(SparseVector *vector, u_int32_t index, float *value);
 
 // calculations
 learner_error sparse_vector_dot_product(SparseVector *v1, SparseVector *v2, float *result);

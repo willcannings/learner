@@ -74,6 +74,20 @@ int test_sparse_vector() {
   test_error(error);
   test_float(value, ((3.0) / (sqrtf(5.0) * sqrtf(50.0))));
   
+  // setting existing values
+  test_set_value(v1, 1, 12.0);
+  test_set_value(v1, 0, 11.0);
+  test_set_value(v2, 0, 13.0);
+  test_set_value(v2, 3, 14.0);
+  test_set_value(v2, 2, 15.0);
+  
+  // getting changed values
+  test_get_value(v1, 0, 11.0);
+  test_get_value(v1, 1, 12.0);
+  test_get_value(v2, 0, 13.0);
+  test_get_value(v2, 2, 15.0);
+  test_get_value(v2, 3, 14.0);
+  
   // cleanup
   error = sparse_vector_free(v1);
   test_error(error);

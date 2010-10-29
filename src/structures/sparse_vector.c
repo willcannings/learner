@@ -5,6 +5,12 @@
 #include <math.h>
 #include "structures/sparse_vector.h"
 
+// hint provided to indicate if an index is, or would be,
+// in the upper or lower half of the value array
+#define LOWER_HALF_HINT 0
+#define UPPER_HALF_HINT 1
+
+
 learner_error sparse_vector_new(SparseVector **vector) {
   *vector = (SparseVector *) calloc(1, sizeof(SparseVector));
   (*vector)->header.min_index  = -1;
@@ -47,38 +53,85 @@ learner_error sparse_vector_unfreeze(SparseVector *vector) {
 }
 
 
-learner_error sparse_vector_set(SparseVector *vector, int index, float value) {
+// internal binary search through a sparse vector to find if an element
+// exists, and what position it exists in. also supply a hint to the
+// calling function indicating if the index is, or would be, in the upper
+// or lower half of the array (used to determine algorithm strategies)
+int sparse_vector_value_index(SparseVector *vector, u_int32_t index, int *hint) {
+  if(vector->header.count == 0) {
+    *hint = UPPER_HALF_HINT;
+    return -1;
+  }
+  
+  int low = 0;
+  int high = vector->header.count - 1;
+  int mid = (high / 2) + 1;
+  
+  // set the hint
+  if(index <= vector->values[mid].index) {
+    *hint = LOWER_HALF_HINT;
+  } else {
+    *hint = UPPER_HALF_HINT;
+  }
+  
+  // single comparison binary search
+  while(low < high) {
+    if (vector->values[mid].index < index) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+    mid = low + ((high - low) / 2);
+  }
+
+  // since we can't early terminate from the loop, 'fix' our check against index here
+  if((low < vector->header.count) && (vector->values[low].index == index)) {
+    return low;
+  } else {
+    return -1;
+  }
+}
+
+// TODO: the length of other rows/columns (or even a param) can be a hint we
+// can use to pre-allocate a vector so reallocations are reduced
+learner_error sparse_vector_set(SparseVector *vector, u_int32_t index, float value) {
   if(!vector) return MISSING_VECTOR;
   if(index < 0) return INDEX_OUT_OF_RANGE;
   
-  // if we're inserting a value in between existing values, determine
-  // how many values will exist below the value we're inserting
-  int lower_values_count = 0;
-  for(int i = 0, count = vector->header.count; i < count; i++) {
-    if(vector->values[i].index == index) {
-      vector->values[i].value = value;
-      return NO_ERROR;
+  // there are three strategies we take for setting a value:
+  // - index already exists: simply set the value
+  // - index is in the lower half of the existing values: copy the array to
+  // a new allocation and set the value (faster than a shift)
+  // - index is in the upper half of the existing values: realloc the array and
+  // shift the existing values larger than the new value up one (faster than copy)
+  
+  int hint = -1;
+  int i = sparse_vector_value_index(vector, index, &hint);
+  
+  if(i != -1) {
+    vector->values[i].value = value;
+    return NO_ERROR;
+  // FIXME: lower half copy needs to be implemented
+  } else {
+    // resize the values array to hold the new value
+    vector->values = realloc(vector->values, (vector->header.count + 1) * sizeof(sparse_vector_value));
+  
+    // shift values with indexes greater than index up one position. we
+    // need to iterate backwards so we don't obliterate values as we
+    // copy them (i.e shifting A, B, C up one position would copy A over
+    // B if we performed the shift in ascending order)
+    i = vector->header.count;
+    for(; vector->values[i - 1].index > index; i--) {
+      vector->values[i].value = vector->values[i - 1].value;
+      vector->values[i].index = vector->values[i - 1].index;
     }
-    
-    if(vector->values[i].index < index)
-      lower_values_count++;
-    else
-      break;
   }
   
-  // create a new values array, copy the values below the new value,
-  // then the values following the new value, before setting the value
-  // TODO: why isn't this a re-alloc!?!?
-  sparse_vector_value *new_values = (sparse_vector_value *) malloc(sizeof(sparse_vector_value) * (vector->header.count + 1));
-  memcpy((void *) new_values, (void *) vector->values, lower_values_count * sizeof(sparse_vector_value));
-  memcpy((void *) new_values + ((lower_values_count + 1) * sizeof(sparse_vector_value)), (void *) vector->values + (lower_values_count * sizeof(sparse_vector_value)), (vector->header.count - lower_values_count) * sizeof(sparse_vector_value));
-  new_values[lower_values_count].index = index;
-  new_values[lower_values_count].value = value;
+  // set the new value
+  vector->values[i].index = index;
+  vector->values[i].value = value;
   
-  if(vector->values)
-    free(vector->values);
-  vector->values = new_values;
-
+  // update min/max indexes, and count
   if(index < vector->header.min_index || vector->header.min_index == -1)
     vector->header.min_index = index;
   if(index > vector->header.max_index || vector->header.max_index == -1)
@@ -89,19 +142,20 @@ learner_error sparse_vector_set(SparseVector *vector, int index, float value) {
 }
 
 
-learner_error sparse_vector_get(SparseVector *vector, int index, float *value) {
+learner_error sparse_vector_get(SparseVector *vector, u_int32_t index, float *value) {
   if(!vector) return MISSING_VECTOR;
   if(index < vector->header.min_index || index > vector->header.max_index) return INDEX_OUT_OF_RANGE;
   
-  // TODO: binary search instead of linear
-  for(int i = 0, count = vector->header.count; i < count; i++) {
-    if(vector->values[i].index == index) {
-      *value = vector->values[i].value;
-      return NO_ERROR;
-    }
+  u_int32_t i = 0;
+  int hint = 0;
+  i = sparse_vector_value_index(vector, index, &hint);
+  
+  if(i != -1) {
+    *value = vector->values[i].value;
+    return NO_ERROR;
+  } else {
+    return INDEX_NOT_FOUND;
   }
-
-  return INDEX_NOT_FOUND;
 }
 
 
