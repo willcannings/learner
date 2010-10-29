@@ -23,7 +23,10 @@ char *learner_error_codes[] = {
   "unknown distributed operation requested",
   "an operation requiring a name was requested, but no name was provided",
   "database error",
-  "unknown key"
+  "unknown key",
+  "file not found",
+  "file IO error",
+  "parse error"
 };
 
 // ------------------------------------------

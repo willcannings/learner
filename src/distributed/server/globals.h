@@ -1,3 +1,4 @@
+#include "config.h"
 #include <tchdb.h>
 
 #ifndef __learner_server_globals__
@@ -14,5 +15,8 @@ int process_queue_writer = 0;
 
 // state
 int shutting_down = 0;
+
+// config
+learner_config config;
 
 #endif

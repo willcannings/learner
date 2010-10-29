@@ -14,7 +14,10 @@ typedef enum {
   UNKNOWN_OPERATION,
   NAME_MISSING,
   DATABASE_ERROR,
-  UNKNOWN_KEY
+  UNKNOWN_KEY,
+  FILE_NOT_FOUND,
+  FILE_IO_ERROR,
+  PARSE_ERROR
 } learner_error;
 
 #endif

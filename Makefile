@@ -7,8 +7,8 @@ test: test_sparse_vector.o test_vector.o tests/test_learner.c
 	$(CC) $(CFLAGS) tests/test_learner.c obj/test_sparse_vector.o obj/test_vector.o obj/logging.o obj/learner.o obj/sparse_vector.o obj/vector.o -lm -o bin/run_tests
 	./bin/run_tests
 
-server: client.o server.o keyed_values.o read_thread.o process_thread.o
-	$(CC) $(CFLAGS) obj/client.o obj/server.o obj/keyed_values.o obj/read_thread.o obj/process_thread.o obj/learner.o obj/logging.o -ltokyocabinet -o bin/server
+server: client.o server.o keyed_values.o read_thread.o process_thread.o config.o
+	$(CC) $(CFLAGS) obj/client.o obj/server.o obj/keyed_values.o obj/read_thread.o obj/process_thread.o obj/learner.o obj/logging.o obj/config.o -ltokyocabinet -o bin/server
 
 client_test: client.o tests/client_test.c
 	$(CC) $(CFLAGS) tests/client_test.c obj/client.o obj/learner.o obj/logging.o -o bin/client_test
@@ -45,7 +45,7 @@ protocol: src/distributed/protocol/protocol.h src/distributed/protocol/protomsg.
 client.o: src/distributed/client/client.c protocol core
 	$(CC) $(CFLAGS) -c src/distributed/client/client.c -o obj/client.o
 
-server.o: src/distributed/server/server.c src/distributed/server/server.h src/distributed/server/globals.h protocol core
+server.o: src/distributed/server/server.c src/distributed/server/server.h src/distributed/server/globals.h src/distributed/server/config.h protocol core
 	$(CC) $(CFLAGS) -c src/distributed/server/server.c -o obj/server.o
 
 keyed_values.o: src/distributed/server/keyed_values.c src/distributed/server/server.h protocol core
@@ -56,6 +56,9 @@ read_thread.o: src/distributed/server/read_thread.c protocol core
 
 process_thread.o: src/distributed/server/process_thread.c protocol core
 	$(CC) $(CFLAGS) -c src/distributed/server/process_thread.c -o obj/process_thread.o
+
+config.o: src/distributed/server/config.c core
+	$(CC) $(CFLAGS) -c src/distributed/server/config.c -o obj/config.o
 
 
 

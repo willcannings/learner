@@ -20,8 +20,9 @@ static pthread_t *read_threads;
 
 
 void initialize_server() {
-  // initialise learner logging
+  // initialise learner & server configuration
   learner_initialize();
+  find_and_read_configuration_file(NULL, &config);
   
   // install the cleanup signal handler
   signal(SIGQUIT, cleanup_server);
@@ -48,9 +49,11 @@ void initialize_server() {
   
   // create the server socket
   int error = 0;
-  create_server_socket(LISTEN_PORT, ACCEPT_BACKLOG, server_socket, error);
+  create_server_socket(config.port, config.accept_backlog, server_socket, error);
   if (error) {
     fatal_with_errno("Unable to open a server socket");
+  } else {
+    debug_with_format("Server listening on port %i", config.port);
   }
   
   // create the unnamed sockets used as queues between threads
@@ -68,12 +71,12 @@ void initialize_server() {
   process_queue_writer = sockets[1];
   
   // reader and processing threads
-  read_threads = (pthread_t *) malloc(sizeof(pthread_t *) * READ_THREADS);
-  process_threads = (pthread_t *) malloc(sizeof(pthread_t *) * PROCESS_THREADS);
-  for (int i = 0; i < READ_THREADS; i++) {
+  read_threads = (pthread_t *) malloc(sizeof(pthread_t *) * config.read_threads);
+  process_threads = (pthread_t *) malloc(sizeof(pthread_t *) * config.process_threads);
+  for (int i = 0; i < config.read_threads; i++) {
     pthread_create(&read_threads[i], NULL, read_thread, NULL);
   }
-  for (int i = 0; i < PROCESS_THREADS; i++) {
+  for (int i = 0; i < config.process_threads; i++) {
     pthread_create(&process_threads[i], NULL, process_thread, NULL);
   }
 }
@@ -98,13 +101,13 @@ void cleanup_server() {
   if (process_queue_writer) close(process_queue_writer);
   
   // threads; these will close their own sockets with their cleanup handlers
-  for (int i = 0; i < READ_THREADS; i++) {
+  for (int i = 0; i < config.read_threads; i++) {
     if (error = pthread_cancel(read_threads[i])) {
       fatal_with_format("Unable to close read thread during cleanup: %s", strerror(error));
     }
   }
   
-  for (int i = 0; i < PROCESS_THREADS; i++) {
+  for (int i = 0; i < config.process_threads; i++) {
     if (error = pthread_cancel(process_threads[i])) {
       fatal_with_format("Unable to close process thread during cleanup: %s", strerror(error));
     }

@@ -1,0 +1,5 @@
+option(port, int, 3579)
+option(accept_backlog, int, 10)
+option(read_threads, int, 1)
+option(process_threads, int, LEARNER_CORES)
+option(epoll_size, int, 20)
