@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include "core/errors.h"
+#include "matrix.h"
 
 #ifndef __learner_sparse_vector__
 #define __learner_sparse_vector__
@@ -22,6 +23,7 @@ typedef struct {
 typedef struct {
   sparse_vector_header  header;
   sparse_vector_value   *values;
+  learner_matrix        *matrix;
 } SparseVector;
 #pragma pack(pop)
 

@@ -5,12 +5,6 @@
 #include <math.h>
 #include "structures/sparse_vector.h"
 
-// hint provided to indicate if an index is, or would be,
-// in the upper or lower half of the value array
-#define LOWER_HALF_HINT 0
-#define UPPER_HALF_HINT 1
-
-
 learner_error sparse_vector_new(SparseVector **vector) {
   *vector = (SparseVector *) calloc(1, sizeof(SparseVector));
   (*vector)->header.min_index  = -1;
@@ -53,57 +47,36 @@ learner_error sparse_vector_unfreeze(SparseVector *vector) {
 }
 
 
-// internal binary search through a sparse vector to find if an element
-// exists, and what position it exists in. also supply a hint to the
-// calling function indicating if the index is, or would be, in the upper
-// or lower half of the array (used to determine algorithm strategies)
-int sparse_vector_value_index(SparseVector *vector, u_int32_t index, int *hint) {
-  if(vector->header.count == 0) {
-    *hint = UPPER_HALF_HINT;
-    return -1;
-  }
-  
+// internal binary search through a sparse vector to find element indexes
+int sparse_vector_value_index(SparseVector *vector, u_int32_t index, u_int32_t *hint) {
   int low = 0;
   int high = vector->header.count - 1;
-  int mid = (high / 2) + 1;
+  int mid = high / 2;
   
-  // set the hint
-  if(index <= vector->values[mid].index) {
-    *hint = LOWER_HALF_HINT;
-  } else {
-    *hint = UPPER_HALF_HINT;
-  }
-  
-  // single comparison binary search
-  while(low < high) {
+  // branch prediction makes this triple clause if statement faster
+  // than a double clause "single comparison" search. precondition
+  // loops also seem to be faster than post condition loops in GCC,
+  // really don't know why... this implementation ends up being
+  // around 30% faster than well known single comparison versions.
+  while(low <= high) {
     if (vector->values[mid].index < index) {
       low = mid + 1;
+    } else if(vector->values[mid].index > index) {
+      high = mid - 1;
     } else {
-      high = mid;
+      return mid;
     }
-    mid = low + ((high - low) / 2);
+    mid = (high + low) / 2;
   }
-
-  // since we can't early terminate from the loop, 'fix' our check against index here
-  if((low < vector->header.count) && (vector->values[low].index == index)) {
-    return low;
-  } else {
-    return -1;
-  }
+  
+  if(hint)
+    *hint = high + 1;
+  return -1;
 }
 
-// TODO: the length of other rows/columns (or even a param) can be a hint we
-// can use to pre-allocate a vector so reallocations are reduced
 learner_error sparse_vector_set(SparseVector *vector, u_int32_t index, float value) {
   if(!vector) return MISSING_VECTOR;
   if(index < 0) return INDEX_OUT_OF_RANGE;
-  
-  // there are three strategies we take for setting a value:
-  // - index already exists: simply set the value
-  // - index is in the lower half of the existing values: copy the array to
-  // a new allocation and set the value (faster than a shift)
-  // - index is in the upper half of the existing values: realloc the array and
-  // shift the existing values larger than the new value up one (faster than copy)
   
   int hint = -1;
   int i = sparse_vector_value_index(vector, index, &hint);
@@ -146,14 +119,13 @@ learner_error sparse_vector_get(SparseVector *vector, u_int32_t index, float *va
   if(!vector) return MISSING_VECTOR;
   if(index < vector->header.min_index || index > vector->header.max_index) return INDEX_OUT_OF_RANGE;
   
-  u_int32_t i = 0;
-  int hint = 0;
-  i = sparse_vector_value_index(vector, index, &hint);
+  u_int32_t i = sparse_vector_value_index(vector, index, NULL);
   
   if(i != -1) {
     *value = vector->values[i].value;
     return NO_ERROR;
   } else {
+    *value = 0.0;
     return INDEX_NOT_FOUND;
   }
 }
