@@ -2,6 +2,7 @@
 
 int main(void) {
   int failed = 0;
+  learner_initialize();
   run_test(test_vector);
   run_test(test_sparse_vector);
   

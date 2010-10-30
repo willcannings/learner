@@ -4,7 +4,7 @@ CC=gcc
 
 # programs
 test: test_sparse_vector.o test_vector.o tests/test_learner.c
-	$(CC) $(CFLAGS) tests/test_learner.c obj/test_sparse_vector.o obj/test_vector.o obj/logging.o obj/learner.o obj/sparse_vector.o obj/vector.o -lm -o bin/run_tests
+	$(CC) $(CFLAGS) tests/test_learner.c obj/test_sparse_vector.o obj/test_vector.o obj/logging.o obj/learner.o obj/sparse_vector.o obj/vector.o obj/matrix.o -lm -o bin/run_tests
 	./bin/run_tests
 
 server: client.o server.o keyed_values.o read_thread.o process_thread.o config.o
@@ -38,6 +38,9 @@ sparse_vector.o: src/structures/sparse_vector.c src/structures/sparse_vector.h c
 vector.o: src/structures/vector.c src/structures/vector.h core
 	$(CC) $(CFLAGS) -c src/structures/vector.c -o obj/vector.o
 
+matrix.o: src/structures/matrix.c src/structures/matrix.h core
+	$(CC) $(CFLAGS) -c src/structures/matrix.c -o obj/matrix.o
+
 
 # distributed
 protocol: src/distributed/protocol/protocol.h src/distributed/protocol/protomsg.h \
@@ -63,7 +66,7 @@ config.o: src/distributed/server/config.c core
 
 
 # tests
-test_sparse_vector.o: tests/test_sparse_vector.c tests/tests.h sparse_vector.o core
+test_sparse_vector.o: tests/test_sparse_vector.c tests/tests.h sparse_vector.o matrix.o core
 	$(CC) $(CFLAGS) -c tests/test_sparse_vector.c -o obj/test_sparse_vector.o
 
 test_vector.o: tests/test_vector.c tests/tests.h vector.o core

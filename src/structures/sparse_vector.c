@@ -3,12 +3,15 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include "core/logging.h"
 #include "structures/sparse_vector.h"
 
-learner_error sparse_vector_new(SparseVector **vector) {
+learner_error sparse_vector_new(SparseVector **vector, Matrix *matrix) {
+  if(!matrix) return MISSING_MATRIX;
   *vector = (SparseVector *) calloc(1, sizeof(SparseVector));
   (*vector)->header.min_index  = -1;
   (*vector)->header.max_index  = -1;
+  (*vector)->matrix = matrix;
   return NO_ERROR;
 }
 
@@ -74,44 +77,47 @@ int sparse_vector_value_index(SparseVector *vector, u_int32_t index, u_int32_t *
   return -1;
 }
 
+
 learner_error sparse_vector_set(SparseVector *vector, u_int32_t index, float value) {
   if(!vector) return MISSING_VECTOR;
   if(index < 0) return INDEX_OUT_OF_RANGE;
   
-  int hint = -1;
-  int i = sparse_vector_value_index(vector, index, &hint);
+  int i = -1, hint = -1;
+  i = sparse_vector_value_index(vector, index, &hint);
   
-  if(i != -1) {
+  if(i == -1) {
+    if(vector->header.buffer_remaining == 0) {
+      vector->values = realloc(vector->values, (vector->header.count + vector->matrix->buffer_delta) * sizeof(sparse_vector_value));
+      vector->header.buffer_remaining = vector->matrix->buffer_delta;
+    }
+    // when we set a new value we need to shift all the values with indexes greater
+    // than the new value up by one. if we were to copy from left to right values
+    // would obliterate each other (e.g a, b, c shifted by one would overwrite b
+    // with a before overwriting c with a again). copy from right to left is very
+    // slow because the CPU caches from left to right, so we create a temporary
+    // buffer, copy the necessary values to it, then copy it back.
+    int bytes = (vector->header.count - hint) * sizeof(sparse_vector_value);
+    sparse_vector_value *block = (sparse_vector_value *) malloc(bytes);
+    memcpy(block, vector->values + hint, bytes);
+    memcpy(vector->values + hint + 1, block, bytes);
+    free(block);
+    
+    vector->values[hint].value = value;
+    vector->values[hint].index = index;
+    
+    if(index < vector->header.min_index || vector->header.min_index == -1)
+      vector->header.min_index = index;
+    if(index > vector->header.max_index || vector->header.max_index == -1)
+      vector->header.max_index = index;
+    
+    vector->header.count++;
+    vector->header.buffer_remaining--;  
+    return NO_ERROR;
+    
+  } else {
     vector->values[i].value = value;
     return NO_ERROR;
-  // FIXME: lower half copy needs to be implemented
-  } else {
-    // resize the values array to hold the new value
-    vector->values = realloc(vector->values, (vector->header.count + 1) * sizeof(sparse_vector_value));
-  
-    // shift values with indexes greater than index up one position. we
-    // need to iterate backwards so we don't obliterate values as we
-    // copy them (i.e shifting A, B, C up one position would copy A over
-    // B if we performed the shift in ascending order)
-    i = vector->header.count;
-    for(; vector->values[i - 1].index > index; i--) {
-      vector->values[i].value = vector->values[i - 1].value;
-      vector->values[i].index = vector->values[i - 1].index;
-    }
   }
-  
-  // set the new value
-  vector->values[i].index = index;
-  vector->values[i].value = value;
-  
-  // update min/max indexes, and count
-  if(index < vector->header.min_index || vector->header.min_index == -1)
-    vector->header.min_index = index;
-  if(index > vector->header.max_index || vector->header.max_index == -1)
-    vector->header.max_index = index;
-  vector->header.count++;
-  
-  return NO_ERROR;
 }
 
 

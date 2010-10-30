@@ -12,24 +12,27 @@ typedef struct {
   float     value;
 } sparse_vector_value;
 
+// attempt to align fields on 32/64 bit boundaries
 typedef struct {
-  u_int32_t count;
-  u_int8_t  frozen;
+  u_int64_t count;
+  u_int64_t min_index;
+  u_int64_t max_index;
+  u_int64_t matrix_index;
+  u_int64_t buffer_remaining;
   float     magnitude;
-  u_int32_t min_index;
-  u_int32_t max_index;
+  u_int8_t  frozen;
 } sparse_vector_header;
 
 typedef struct {
   sparse_vector_header  header;
   sparse_vector_value   *values;
-  learner_matrix        *matrix;
+  Matrix                *matrix;
 } SparseVector;
 #pragma pack(pop)
 
 
 // core functions
-learner_error sparse_vector_new(SparseVector **vector);
+learner_error sparse_vector_new(SparseVector **vector, Matrix *matrix);
 learner_error sparse_vector_free(SparseVector *vector);
 learner_error sparse_vector_freeze(SparseVector *vector);
 learner_error sparse_vector_frozen(SparseVector *vector, int *frozen);

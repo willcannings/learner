@@ -17,10 +17,14 @@ int test_sparse_vector() {
   learner_error error;
   SparseVector *v1, *v2;
   
+  // create a generic matrix
+  Matrix *m;
+  error = matrix_new(&m);
+  
   // creating
-  error = sparse_vector_new(&v1);
+  error = sparse_vector_new(&v1, m);
   test_error(error);
-  error = sparse_vector_new(&v2);
+  error = sparse_vector_new(&v2, m);
   test_error(error);
   
   // setting

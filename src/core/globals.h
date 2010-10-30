@@ -26,7 +26,8 @@ char *learner_error_codes[] = {
   "unknown key",
   "file not found",
   "file IO error",
-  "parse error"
+  "parse error",
+  "missing matrix"
 };
 
 // ------------------------------------------
