@@ -119,16 +119,16 @@ void close_client_connection(int socket) {
 void *read_thread(void *param) {
   #ifdef LEARNER_KQUEUE
     int queue = kqueue();
-    struct kevent event;
+    struct kevent *event = (struct kevent *) malloc(sizeof(struct kevent) * config.process_threads);
   #endif
   #ifdef LEARNER_EPOLL
     int queue = epoll_create(config.epoll_size);
-    struct epoll_event event;
+    struct epoll_event *event = (struct epoll_event *) malloc(sizeof(struct epoll_event) * config.process_threads);
   #endif
-  int events = 0, fd = 0, eof = 0;
-    
+  
+  int events = 0, fd = 0, eof = 0, i = 0;  
   if (queue == -1) {
-    fatal_with_errno("Unable to create a new kqueue object");
+    fatal_with_errno("Unable to create event queue");
   }
     
   // add the read queue socket to the queue
@@ -136,13 +136,12 @@ void *read_thread(void *param) {
   note("Read thread started");
     
   while(1) {
-    // FIXME: for now, we only monitor one event change at a time
     // block until a socket is available for reading
     #ifdef LEARNER_KQUEUE
-      events = kevent(queue, NULL, 0, &event, 1, NULL);
+      events = kevent(queue, NULL, 0, event, config.process_threads, NULL);
     #endif
     #ifdef LEARNER_EPOLL
-      events = epoll_wait(queue, &event, 1, -1);
+      events = epoll_wait(queue, event, config.process_threads, -1);
     #endif
     
     // handle errors
@@ -150,47 +149,51 @@ void *read_thread(void *param) {
       fatal_with_errno("Error waiting for the read thread queue");
     }
     
-    // the socket used for the queue is available to read
-    #ifdef LEARNER_KQUEUE
-      fd = event.ident;
-      eof = (event.flags & EV_EOF) || (event.flags & EV_ERROR);
-    #endif
-    #ifdef LEARNER_EPOLL
-      fd = event.data.fd;
-      eof = (event.events & EPOLLRDHUP) || (event.events & EPOLLERR) || (event.events & EPOLLHUP);
-    #endif
-    
-    if (fd == read_queue_reader) {
-      if (eof) {
-        pthread_exit(NULL);
+    // handle each event
+    for(i = 0; i < events; i++) {
+      #ifdef LEARNER_KQUEUE
+        fd = event[i].ident;
+        eof = (event[i].flags & EV_EOF) || (event[i].flags & EV_ERROR);
+      #endif
+      #ifdef LEARNER_EPOLL
+        fd = event[i].data.fd;
+        eof = (event[i].events & EPOLLRDHUP) || (event[i].events & EPOLLERR) || (event[i].events & EPOLLHUP);
+      #endif
+
+      // the socket used for the queue is available to read
+      if (fd == read_queue_reader) {
+        if (eof) {
+          pthread_exit(NULL);
+        } else {
+          #ifdef LEARNER_KQUEUE
+             if (event[i].data != sizeof(int)) {
+               continue;
+              }
+          #endif
+
+          fd = read_client_from_queue();
+
+          #ifdef LEARNER_KQUEUE
+            add_socket_to_queue(queue, fd, EV_ONESHOT);
+          #endif
+          #ifdef LEARNER_EPOLL
+            add_socket_to_queue(queue, fd, 0);
+          #endif
+        }
+
+      // a client socket is ready to read
       } else {
-        #ifdef LEARNER_KQUEUE
-           if (event.data != sizeof(int)) {
-             continue;
+        if (eof) {
+          close_client_connection(fd);
+        } else {
+          add_client_to_process_queue(fd);
+          #ifdef LEARNER_EPOLL
+            if (epoll_ctl(queue, EPOLL_CTL_DEL, fd, NULL) == -1) {
+              fatal_with_errno("Unable to remove client socket from the epoll queue");
             }
-        #endif
-        
-        fd = read_client_from_queue();
-        
-        #ifdef LEARNER_KQUEUE
-          add_socket_to_queue(queue, fd, EV_ONESHOT);
-        #endif
-        #ifdef LEARNER_EPOLL
-          add_socket_to_queue(queue, fd, 0);
-        #endif
+          #endif
+        }
       }
-    } else {
-      if (eof) {
-        close_client_connection(fd);
-      } else {
-        add_client_to_process_queue(fd);
-        #ifdef LEARNER_EPOLL
-          if (epoll_ctl(queue, EPOLL_CTL_DEL, fd, NULL) == -1) {
-            fatal_with_errno("Unable to remove client socket from the epoll queue");
-          }
-        #endif
-      }
-    }
-  }
-  
-}
+    } // end for
+  } // end while
+} // end function
