@@ -81,7 +81,7 @@ void initialize_server() {
   }
 }
 
-
+// FIXME: bits and pieces in here may use malloc, which isn't reentrant on all platforms
 void cleanup_server() {
   note("Preparing to quit... cleaning up");
   shutting_down = 1;
