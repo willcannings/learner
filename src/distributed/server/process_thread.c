@@ -16,6 +16,7 @@ void *process_thread(void *param) {
   learner_response *res = NULL;
   learner_request *req = NULL;
   int bytes = 0, error = 0;
+  init_learner_response(res);
   
   // we store a reference to the current client, allowing cleanup to close the connection
   int *current_client = (int *) malloc(sizeof(int));
@@ -50,18 +51,19 @@ void *process_thread(void *param) {
       }
     }
     
-    init_learner_response(res);
     switch (get_learner_request_item(req)) {
       case KEY_VALUE:
-        debug("Key value request");
         switch (get_learner_request_operation(req)) {
           case SET:
+            debug("Set key/value request");
             error = handle_set_key_value(req, res);
             break;
           case GET:
+            debug("Get key/value request");
             error = handle_get_key_value(req, res);
             break;
           case DELETE:
+            debug("Delete key/value request");
             error = handle_delete_key_value(req, res);
             break;
         }
@@ -96,9 +98,11 @@ void *process_thread(void *param) {
       }
     }
     
-    // free the response and finish
-    free_learner_response(res);
-    res = NULL;
+    // free the response data and finish
+    if(res->data) {
+      free(res->data);
+      set_learner_response_data(res, NULL, 0);
+    }
     debug("Completed request");
     
     // move the client back to the read queue
