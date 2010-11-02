@@ -11,6 +11,7 @@
 
 int test_vector();
 int test_sparse_vector();
+int test_paged_file();
 
 #define print_separator()       printf("\n=================================================\n");
 #define test(expr)              if(expr){printf("+\t%s\n", #expr); passed++;} else {printf("-\t%s\n\t(%s:%u)\n", #expr, __FILE__, __LINE__); failed++;}

@@ -11,4 +11,7 @@ typedef struct {
   char      *name;
 } Matrix;
 
+learner_error matrix_new(Matrix **matrix);
+learner_error matrix_free(Matrix *matrix);
+
 #endif

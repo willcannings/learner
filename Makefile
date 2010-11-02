@@ -3,8 +3,8 @@ CC=gcc
 
 
 # programs
-test: test_sparse_vector.o test_vector.o tests/test_learner.c
-	$(CC) $(CFLAGS) tests/test_learner.c obj/test_sparse_vector.o obj/test_vector.o obj/logging.o obj/learner.o obj/sparse_vector.o obj/vector.o obj/matrix.o -lm -o bin/run_tests
+test: test_sparse_vector.o test_vector.o test_paged_file.o tests/test_learner.c
+	$(CC) $(CFLAGS) tests/test_learner.c obj/test_sparse_vector.o obj/test_vector.o obj/test_paged_file.o obj/logging.o obj/learner.o obj/sparse_vector.o obj/vector.o obj/matrix.o obj/paged_file.o -lm -o bin/run_tests
 	./bin/run_tests
 
 server: client.o server.o keyed_values.o read_thread.o process_thread.o config.o
@@ -42,6 +42,11 @@ matrix.o: src/structures/matrix.c src/structures/matrix.h core
 	$(CC) $(CFLAGS) -c src/structures/matrix.c -o obj/matrix.o
 
 
+# data store
+paged_file.o: src/datastore/paged_file.c src/datastore/paged_file.h core
+	$(CC) $(CFLAGS) -c src/datastore/paged_file.c -o obj/paged_file.o
+
+
 # distributed
 protocol: src/distributed/protocol/protocol.h src/distributed/protocol/protomsg.h \
 	src/distributed/protocol/learner_request_message.h src/distributed/protocol/learner_response_message.h
@@ -71,3 +76,6 @@ test_sparse_vector.o: tests/test_sparse_vector.c tests/tests.h sparse_vector.o m
 
 test_vector.o: tests/test_vector.c tests/tests.h vector.o core
 	$(CC) $(CFLAGS) -c tests/test_vector.c -o obj/test_vector.o
+
+test_paged_file.o: tests/test_paged_file.c tests/tests.h paged_file.o core
+	$(CC) $(CFLAGS) -c tests/test_paged_file.c -o obj/test_paged_file.o

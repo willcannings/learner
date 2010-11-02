@@ -1,4 +1,5 @@
 #include "tests.h"
+#include "structures/matrix.h"
 
 #define test_get_value(v, index, val) {\
   error = sparse_vector_get(v, index, &value);\

@@ -89,7 +89,7 @@ void cleanup_server() {
   
   // tokyo db
   if (!tchdbclose(db)) {
-    fatal_with_format("Error closing the database: %s", tchdberrmsg(tchdbecode(db)));
+    warn_with_format("Error closing the database: %s", tchdberrmsg(tchdbecode(db)));
   }
   tchdbdel(db);
   
@@ -103,13 +103,13 @@ void cleanup_server() {
   // threads; these will close their own sockets with their cleanup handlers
   for (int i = 0; i < config.read_threads; i++) {
     if (error = pthread_cancel(read_threads[i])) {
-      fatal_with_format("Unable to close read thread during cleanup: %s", strerror(error));
+      warn_with_format("Unable to close read thread during cleanup: %s", strerror(error));
     }
   }
   
   for (int i = 0; i < config.process_threads; i++) {
     if (error = pthread_cancel(process_threads[i])) {
-      fatal_with_format("Unable to close process thread during cleanup: %s", strerror(error));
+      warn_with_format("Unable to close process thread during cleanup: %s", strerror(error));
     }
   }
 

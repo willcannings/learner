@@ -48,6 +48,22 @@ echo "#define LEARNER_CORES $LEARNER_CORES" >> $HEADER
 echo "Configuring for $LEARNER_CORES cores"
 
 
+# Page Size
+echo "= Determining page size..."
+LEARNER_PAGE_SIZE_TEST="auto/page_size"
+cc "$LEARNER_PAGE_SIZE_TEST.c" -o "$LEARNER_PAGE_SIZE_TEST" >> $ERRORS 2>&1
+if [ -x $LEARNER_PAGE_SIZE_TEST ]; then
+  LEARNER_PAGE_SIZE=`$LEARNER_PAGE_SIZE_TEST`
+  rm -f "$LEARNER_PAGE_SIZE_TEST"
+else
+  echo "Unable to determine page size - page size test program compilation failed"
+  LEARNER_PAGE_SIZE="4096"
+fi
+
+echo "#define LEARNER_PAGE_SIZE $LEARNER_PAGE_SIZE" >> $HEADER
+echo "Configuring for page size of $LEARNER_PAGE_SIZE"
+
+
 # Event system
 echo "= Determining which event system to use..."
 case "$LEARNER_OS" in

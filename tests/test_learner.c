@@ -5,6 +5,7 @@ int main(void) {
   learner_initialize();
   run_test(test_vector);
   run_test(test_sparse_vector);
+  run_test(test_paged_file);
   
   print_separator();
   if(failed > 0) {
