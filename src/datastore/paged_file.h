@@ -20,13 +20,15 @@ typedef enum {
   PF_MISSING,
   PF_UNINITIALISED,
   PF_INDEX_OUT_OF_RANGE,
+  PF_LENGTH_INVALID,
   PF_MISSING_PATH,
   PF_MISSING_DATA,
   PF_TRUNCATED_FILE,
   PF_WRONG_FORMAT,
   PF_IO_ERROR,
   PF_MEMORY_ERROR,
-  PF_PTHREAD_ERROR
+  PF_PTHREAD_ERROR,
+  PF_INVALID_REGION
 } pf_error;
 
 
@@ -41,8 +43,8 @@ typedef enum {
     uint32_t  version;            // paged file version number
     uint32_t  page_size;          // size of pages in bytes
     uint32_t  free_pages;         // number of free pages
-    uint64_t  sectors;            // number of sectors in the file (a sector (8 * page_size) pages long)
-    uint64_t  pages;              // number of pages in the file (includes sector start pages)
+    uint64_t  sectors;            // number of sectors in the file (a sector is (8 * page_size) pages long)
+    uint64_t  pages;              // number of written pages in the file (includes sector start pages)
     uint64_t  attributes[12];     // other datastore specific header attributes
   } paged_file_header;
 #pragma pack(pop)
@@ -51,7 +53,14 @@ typedef enum {
 typedef struct {
   pthread_rwlock_t  *lock;        // pthread read/write locks are used for concurrency control
   paged_file_header header;       // store of the complete header of a paged file
+  void              **free_pages; // sector start pages; a bit array of pages indicating if they are free
   int               file;         // file descriptor
+  
+  // rather than recalculating these each call, we cache
+  // a number of useful numbers in the object
+  uint64_t          sector_length;
+  uint64_t          sector_offset;
+  uint64_t          length;
 } paged_file;
 
 

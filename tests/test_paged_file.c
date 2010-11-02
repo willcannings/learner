@@ -7,16 +7,16 @@ int test_paged_file() {
   paged_file *file = NULL;
   
   error = paged_file_open("test_file.db", 1024, &file);
-  test(error);
+  test(error == PF_NO_ERROR);
   
   paged_file_set_attribute(file, 0, 10);
   test(paged_file_get_attribute(file, 0) == 10);
   
   error = paged_file_flush(file);
-  test(error);
+  test(error == PF_NO_ERROR);
   
   error = paged_file_close(file);
-  test(error);
+  test(error == PF_NO_ERROR);
   
 /*
   // writing

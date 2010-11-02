@@ -24,9 +24,49 @@
 #define test_for_uninitialised_pf()     if(!file || !file->file || !file->lock) {return PF_UNINITIALISED;}
 #define test_for_missing_data()         if(!data) {return PF_MISSING_DATA;}
 #define test_for_missing_path()         if(!path) {return PF_MISSING_PATH;}
-#define obtain_write_lock(i)            error_for(pthread_rwlock_wrlock(file->lock), PF_PTHREAD_ERROR); push_cleanup_handler(i);
-#define obtain_read_lock(i)             error_for(pthread_rwlock_rdlock(file->lock), PF_PTHREAD_ERROR); push_cleanup_handler(i);
-#define cleanup_lock()                  {if(pthread_rwlock_unlock(file->lock)) set_error(PF_PTHREAD_ERROR);}
+#define obtain_write_lock()             error_for(pthread_rwlock_wrlock(file->lock), PF_PTHREAD_ERROR);
+#define obtain_read_lock()              error_for(pthread_rwlock_rdlock(file->lock), PF_PTHREAD_ERROR);
+#define cleanup_lock()                  if(pthread_rwlock_unlock(file->lock)) set_error(PF_PTHREAD_ERROR);
+#define release_lock()                  error_for(pthread_rwlock_unlock(file->lock), PF_PTHREAD_ERROR);
+
+
+// ------------------------------------------
+// free page helpers
+// ------------------------------------------
+inline int _is_free_page(paged_file *file, uint64_t index) {
+  uint64_t width  = 8 * file->header.page_size; // the number of pages in a sector
+  uint64_t sector = index / width;
+  uint64_t offset = index - (sector * width);
+  uint64_t byte   = offset / 8;
+  char     bit    = offset - (byte * 8);
+  return 0;
+}
+
+// ------------------------------------------
+// private functions
+// ------------------------------------------
+pf_error _pf_write(paged_file *file, uint64_t index, uint64_t start, uint64_t pages, void *data, uint64_t length) {
+  // ensure none of the pages will overwrite a sector start page
+  for(int i = 0; i < pages; i++)
+    if(((index + i) % file->sector_offset) == 0)
+      return PF_INVALID_REGION;
+  
+  // perform the write, assume the caller has obtained a write lock
+  ssize_t bytes = pwrite(file->file, data, length, start);
+  if(bytes != length)
+    return PF_IO_ERROR;
+  else
+    return PF_NO_ERROR;
+}
+
+pf_error _pf_sync_header(paged_file *file) {
+  // perform the write, assume the caller has obtained a write lock
+  ssize_t bytes = pwrite(file->file, &(file->header), sizeof(paged_file_header), 0);
+  if(bytes != sizeof(paged_file_header))
+    return PF_IO_ERROR;
+  else
+    return PF_NO_ERROR;
+}
 
 
 // ------------------------------------------
@@ -73,11 +113,16 @@ pf_error paged_file_open(char *path, uint64_t page_size, paged_file **file) {
     (*file)->file = open(path, O_RDWR | O_CREAT | O_TRUNC);
     error_for((*file)->file == -1, PF_IO_ERROR);
     push_cleanup_handler(4);
-    bytes = write((*file)->file, &((*file)->header), sizeof(paged_file_header));
-    error_for(error < sizeof(paged_file_header), PF_IO_ERROR);
+    error_for(_pf_sync_header(*file), PF_IO_ERROR);
   }
   
-  // cleanup handlers
+  // cache useful calculations rather than performing a calc per call
+  (*file)->sector_length = 8 * page_size;
+  (*file)->sector_offset = 1 + (8 * page_size);
+  (*file)->length = sizeof(paged_file_header) + ((*file)->header.pages * page_size);
+  
+  // cleanup handlers for errors only
+  return PF_NO_ERROR;
   cleanups:
   cleanup(4) close((*file)->file);
   cleanup(3) pthread_rwlock_destroy((*file)->lock);
@@ -105,8 +150,9 @@ pf_error paged_file_close(paged_file *file) {
 pf_error paged_file_flush(paged_file *file) {
   test_for_uninitialised_pf();
   initialise_cleanup();
-
-  obtain_write_lock(1);
+  
+  obtain_write_lock();
+  push_cleanup_handler(1);
   int error = fsync(file->file);
   error_for(error, PF_IO_ERROR);
   
@@ -120,43 +166,54 @@ pf_error paged_file_flush(paged_file *file) {
 // writing
 // ------------------------------------------
 pf_error paged_file_write_offset(paged_file *file, uint64_t index, uint64_t offset, void *data, uint64_t length) {
+  // preconditions
   test_for_uninitialised_pf();
   test_for_missing_data();
   initialise_cleanup();
-  obtain_write_lock(1);
   
-  // calculate offsets. If the write will extend the file, make sure length
-  // is a multiple of the file page size so the total length is consistent
-  void *buffer   = data;
-  int64_t flen   = sizeof(paged_file_header) + (file->header.pages * file->header.page_size);
+  // calculate offsets
+  obtain_write_lock();
+  push_cleanup_handler(1);
   int64_t start  = sizeof(paged_file_header) + (index * file->header.page_size) + offset;
-  int64_t finish = start + length;
-  int64_t pages  = ceil((float)length / file->header.page_size);
-  int64_t full   = pages * file->header.page_size;
-  ssize_t bytes  = 0;
+  int64_t pages  = ceil((float)(offset + length) / file->header.page_size);
   
-  // TODO: check here if index...index+pages runs over any sector start pages
-  // TODO: also check that these pages have been 'allocated' and are marked as not free
+  // perform the write and return any errors
+  pf_error error = _pf_write(file, index, start, pages, data, length);
+  set_error(error);
   
-  // if we need a full buffer, zero 0..offset, copy the user data, and
-  // zero the remainder of the buffer
-  if((start >= flen || finish > flen) && ((length + offset) != full)) {
-    buffer = malloc(full);
+  cleanups:
+  cleanup(1) cleanup_lock();
+  finish();
+}
+
+pf_error paged_file_write_new(paged_file *file, uint64_t *index, void *data, uint64_t length) {
+  // preconditions
+  test_for_uninitialised_pf();
+  test_for_missing_data();
+  initialise_cleanup();
+  
+  // before reading/writing, make sure we have a complete write lock
+  obtain_write_lock();
+  push_cleanup_handler(1);
+  
+  // pad the buffer to be a multiple of page size if necessary
+  void *buffer = data;
+  if((length % file->header.page_size) != 0) {
+    uint64_t data_length = length;
+    length += file->header.page_size - (length % file->header.page_size);
+    
+    buffer = malloc(length);
     error_for(!buffer, PF_MEMORY_ERROR);
     push_cleanup_handler(2);
     
-    memset(buffer, 0, offset);
-    memcpy(buffer + offset, data, length);
-    memset(buffer + offset + length, 0, (full - length - offset) + 1);
-    
-    // realign start and length since we're writing a full buffer now
-    start -= offset;
-    length = full;
+    memcpy(buffer, data, data_length);
+    memset(buffer + length, 0, (length - data_length) + 1);
   }
   
-  // perform the write
-  bytes = pwrite(file->file, buffer, length, start);
-  error_for(bytes != length, PF_IO_ERROR);
+  // perform the write and set our return error to be the response
+  uint64_t pages = 0;
+  pf_error error = _pf_write(file, *index, (*index) * file->header.page_size, pages, data, length);
+  set_error(error);  
   
   // cleanup
   cleanups:
@@ -165,23 +222,18 @@ pf_error paged_file_write_offset(paged_file *file, uint64_t index, uint64_t offs
   finish();
 }
 
-pf_error paged_file_write_new(paged_file *file, uint64_t *index, void *data, uint64_t length) {
-  test_for_uninitialised_pf();
-  initialise_cleanup();
-  obtain_read_lock(1);
-  
-  int64_t pages  = ceil((float)length / file->header.page_size);
-  
-  // cleanup
-  cleanups:
-  cleanup(1) cleanup_lock();
-  finish();
-}
-
 pf_error paged_file_free(paged_file *file, uint64_t index, uint64_t count) {
   test_for_uninitialised_pf();
   initialise_cleanup();
-  obtain_write_lock(1);
+  obtain_write_lock();
+  push_cleanup_handler(1);
+  
+  uint64_t width  = 8 * file->header.page_size;
+  uint64_t sector = index / width;
+  uint64_t offset = index - (sector * width);
+  uint64_t byte   = offset / 8;
+  char     bit    = offset - (byte * 8);
+  
   
   // cleanup
   cleanups:
@@ -196,22 +248,24 @@ pf_error paged_file_free(paged_file *file, uint64_t index, uint64_t count) {
 pf_error paged_file_read_offset(paged_file *file, uint64_t index, uint64_t offset, void **data, uint64_t length) {
   test_for_uninitialised_pf();
   initialise_cleanup();
-  obtain_read_lock(1);
+  obtain_read_lock();
+  push_cleanup_handler(1);
   
-  int64_t flen   = sizeof(paged_file_header) + (file->header.pages * file->header.page_size);
+  // ensure we don't read past EOF
+  length = (length) ? length : file->header.page_size;
+  error_for(length < 0, PF_LENGTH_INVALID);
   int64_t start  = sizeof(paged_file_header) + (index * file->header.page_size) + offset;
-  int64_t finish = start + length;
-  int64_t pages  = ceil((float)length / file->header.page_size);
-  ssize_t bytes  = 0;
+  error_for(start >= file->length || (start + length) > file->length, PF_INDEX_OUT_OF_RANGE);
   
-  // TODO: check here if index...index+pages runs over any sector start pages
-  // TODO: also check that these pages have been 'allocated' and are marked as not free
-  
-  error_for(start >= flen || finish > flen, PF_INDEX_OUT_OF_RANGE);
-  bytes = pread(file->file, data, length, start);
+  // we create the buffer for the user
+  *data = malloc(length);
+  error_for(!*data, PF_MEMORY_ERROR);
+  push_cleanup_handler(2);
+  ssize_t bytes = pread(file->file, *data, length, start);
   error_for(bytes != length, PF_IO_ERROR);
   
   cleanups:
+  cleanup(2) {free(*data); *data = NULL;}
   cleanup(1) cleanup_lock();
-  finish();  
+  finish();
 }
