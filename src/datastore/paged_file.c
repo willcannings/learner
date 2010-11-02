@@ -45,13 +45,7 @@ inline int _is_free_page(paged_file *file, uint64_t index) {
 // ------------------------------------------
 // private functions
 // ------------------------------------------
-pf_error _pf_write(paged_file *file, uint64_t index, uint64_t start, uint64_t pages, void *data, uint64_t length) {
-  // ensure none of the pages will overwrite a sector start page
-  for(int i = 0; i < pages; i++)
-    if(((index + i) % file->sector_offset) == 0)
-      return PF_INVALID_REGION;
-  
-  // perform the write, assume the caller has obtained a write lock
+pf_error _pf_write(paged_file *file, uint64_t start, void *data, uint64_t length) {
   ssize_t bytes = pwrite(file->file, data, length, start);
   if(bytes != length)
     return PF_IO_ERROR;
@@ -60,9 +54,16 @@ pf_error _pf_write(paged_file *file, uint64_t index, uint64_t start, uint64_t pa
 }
 
 pf_error _pf_sync_header(paged_file *file) {
-  // perform the write, assume the caller has obtained a write lock
   ssize_t bytes = pwrite(file->file, &(file->header), sizeof(paged_file_header), 0);
   if(bytes != sizeof(paged_file_header))
+    return PF_IO_ERROR;
+  else
+    return PF_NO_ERROR;
+}
+
+pf_error _pf_sync_sector(paged_file *file, uint64_t sector) {
+  ssize_t bytes = pwrite(file->file, file->free_pages[sector], file->header.page_size, sector * file->sector_offset);
+  if(bytes != file->header.page_size)
     return PF_IO_ERROR;
   else
     return PF_NO_ERROR;
@@ -177,8 +178,12 @@ pf_error paged_file_write_offset(paged_file *file, uint64_t index, uint64_t offs
   int64_t start  = sizeof(paged_file_header) + (index * file->header.page_size) + offset;
   int64_t pages  = ceil((float)(offset + length) / file->header.page_size);
   
+  // ensure none of the pages will overwrite a sector start page
+  for(int i = 0; i < pages; i++)
+    error_for(((index + i) % file->sector_offset) == 0, PF_INVALID_REGION);
+  
   // perform the write and return any errors
-  pf_error error = _pf_write(file, index, start, pages, data, length);
+  pf_error error = _pf_write(file, start, data, length);
   set_error(error);
   
   cleanups:
@@ -212,7 +217,7 @@ pf_error paged_file_write_new(paged_file *file, uint64_t *index, void *data, uin
   
   // perform the write and set our return error to be the response
   uint64_t pages = 0;
-  pf_error error = _pf_write(file, *index, (*index) * file->header.page_size, pages, data, length);
+  pf_error error = _pf_write(file, (*index) * file->header.page_size, data, length);
   set_error(error);  
   
   // cleanup
@@ -228,12 +233,27 @@ pf_error paged_file_free(paged_file *file, uint64_t index, uint64_t count) {
   obtain_write_lock();
   push_cleanup_handler(1);
   
-  uint64_t width  = 8 * file->header.page_size;
-  uint64_t sector = index / width;
-  uint64_t offset = index - (sector * width);
-  uint64_t byte   = offset / 8;
-  char     bit    = offset - (byte * 8);
+  uint64_t min_sector = -1, max_sector = -1;
+  uint64_t sector = 0, offset = 0, byte = 0;
+  char     bit = 0;
   
+  // naive implementation
+  for(int i = index; i < index + count; i++) {
+    sector = index / file->sector_length;
+    offset = index - (sector * file->sector_length);
+    byte   = offset / 8;
+    bit    = offset - (byte * 8);
+    file->free_pages[sector][byte] -= (1 << bit);
+    
+    if(sector < min_sector || min_sector == -1)
+      min_sector = sector;
+    if(sector > max_sector)
+      max_sector = sector;
+  }
+  
+  // write the modified sectors to disk
+  for(int i = min_sector; i <= max_sector; i++)
+    error_for(_pf_sync_sector(file, i), PF_IO_ERROR);
   
   // cleanup
   cleanups:
@@ -253,7 +273,6 @@ pf_error paged_file_read_offset(paged_file *file, uint64_t index, uint64_t offse
   
   // ensure we don't read past EOF
   length = (length) ? length : file->header.page_size;
-  error_for(length < 0, PF_LENGTH_INVALID);
   int64_t start  = sizeof(paged_file_header) + (index * file->header.page_size) + offset;
   error_for(start >= file->length || (start + length) > file->length, PF_INDEX_OUT_OF_RANGE);
   

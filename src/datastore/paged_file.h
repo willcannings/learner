@@ -53,7 +53,7 @@ typedef enum {
 typedef struct {
   pthread_rwlock_t  *lock;        // pthread read/write locks are used for concurrency control
   paged_file_header header;       // store of the complete header of a paged file
-  void              **free_pages; // sector start pages; a bit array of pages indicating if they are free
+  char              **free_pages; // sector start pages; a bit array of pages indicating if they are free
   int               file;         // file descriptor
   
   // rather than recalculating these each call, we cache
