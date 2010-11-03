@@ -6,7 +6,7 @@ ERRORS="configure_errors"
 
 # intro
 echo "Learner auto configuration"
-echo "// configuration generated" > $HEADER
+echo "// Configuration Generated" > $HEADER
 echo "//" `date` >> $HEADER
 echo "" >> $HEADER
 
@@ -62,6 +62,22 @@ fi
 
 echo "#define LEARNER_PAGE_SIZE $LEARNER_PAGE_SIZE" >> $HEADER
 echo "Configuring for page size of $LEARNER_PAGE_SIZE"
+
+
+# Page Size
+echo "= Determining word size..."
+LEARNER_WORD_SIZE_TEST="auto/word_size"
+cc "$LEARNER_WORD_SIZE_TEST.c" -o "$LEARNER_WORD_SIZE_TEST" >> $ERRORS 2>&1
+if [ -x $LEARNER_WORD_SIZE_TEST ]; then
+  LEARNER_WORD_SIZE=`$LEARNER_WORD_SIZE_TEST`
+  rm -f "$LEARNER_WORD_SIZE_TEST"
+else
+  echo "Unable to determine word size - word size test program compilation failed"
+  LEARNER_WORD_SIZE="4"
+fi
+
+echo "#define LEARNER_WORD_SIZE $LEARNER_WORD_SIZE" >> $HEADER
+echo "Configuring for word size of $LEARNER_WORD_SIZE"
 
 
 # Event system
